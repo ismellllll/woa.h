@@ -118,6 +118,33 @@ function getMeta(name: string): string | undefined {
   return document.querySelector(`meta[name="${name}"]`)?.getAttribute("content") || undefined;
 }
 
+import { db } from "./firebase";
+import {
+  collection,
+  addDoc,
+  deleteDoc,
+  updateDoc,
+  doc,
+  query,
+  orderBy,
+  serverTimestamp,
+  onSnapshot,
+  increment,
+  setDoc,
+} from "firebase/firestore";
+
+function useCommentCount(postId?: string) {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!postId) return;
+    const unsub = onSnapshot(collection(db, "posts", postId, "comments"), (snap) => {
+      setCount(snap.size);
+    });
+    return () => unsub();
+  }, [postId]);
+  return count;
+}
+
 function resolveConfig(props: GhostRiderConfig): Required<GhostRiderConfig> | GhostRiderConfig {
   const fromProps = props || {};
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -306,46 +333,56 @@ export type ComingPost = {
   /** optional seed for initial like count (client-only, no server) */
   initialLikes?: number;
   likes?: number;
+  commentsCount?: number; // ✅ add this
 };
 
 const AVATAR_URL =
   "https://cdn.discordapp.com/avatars/271381222184321025/d8c4d7af7ba2973e427ce6ba83662df6.png?size=1024"; // replace with your logo if desired
 
-import { db } from "./firebase";
-import {
-  collection,
-  addDoc,
-  deleteDoc,
-  updateDoc,
-  doc,
-  query,
-  orderBy,
-  serverTimestamp,
-  onSnapshot,
-  increment,
-  setDoc,
-} from "firebase/firestore";
-
 function useComingPosts() {
   const [posts, setPosts] = useState<ComingPost[]>([]);
+  // cache counts we discovered so we can render them without writing to Firestore
+  const backfillCache = useRef<Record<string, number>>({});
+  const fetchedOnce = useRef<Set<string>>(new Set());
 
-  // ✅ Real-time Firestore listener (auto-updates posts instantly)
   useEffect(() => {
     const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((d) => {
-        const docData = d.data();
+    const unsub = onSnapshot(q, async (snap) => {
+      const raw = snap.docs.map((d) => {
+        const x = d.data();
         return {
           id: d.id,
-          caption: docData.caption,
-          imageUrl: docData.imageUrl || undefined,
-          createdAt: docData.createdAt?.toMillis?.() ?? Date.now(),
-          likes: docData.likes ?? 0, // ✅ add this
-        };
-      }) as ComingPost[];
-      setPosts(data);
-    });
+          caption: x.caption,
+          imageUrl: x.imageUrl || undefined,
+          createdAt: x.createdAt?.toMillis?.() ?? Date.now(),
+          likes: x.likes ?? 0,
+        } as ComingPost;
+      });
+      setPosts(raw);
 
+      // fire off backfill requests once per post that still shows 0
+      for (const p of raw) {
+        if ((p.commentsCount ?? 0) === 0 && !fetchedOnce.current.has(p.id)) {
+          fetchedOnce.current.add(p.id);
+          try {
+            const real = c.data().count || 0;
+            if (real > 0) {
+              backfillCache.current[p.id] = real;
+              // update just the UI; do not write to Firestore
+              setPosts((prev) =>
+                prev.map((pp) =>
+                  pp.id === p.id
+                    ? { ...pp, commentsCount: Math.max(pp.commentsCount ?? 0, real) }
+                    : pp,
+                ),
+              );
+            }
+          } catch (e) {
+            console.warn("count backfill failed for", p.id, e);
+          }
+        }
+      }
+    });
     return () => unsub();
   }, []);
 
@@ -356,7 +393,7 @@ function useComingPosts() {
         caption: p.caption,
         imageUrl: isHttpUrl(p.imageUrl) ? p.imageUrl : null,
         createdAt: serverTimestamp(),
-        likes: 0, // ✅ new field
+        likes: 0,
       });
     } catch (err) {
       console.error("Firestore addDoc failed:", err);
@@ -554,11 +591,13 @@ export const InstaActions = ({
   count,
   onLike,
   onComment,
+  commentCount = 0,
 }: {
   liked: boolean;
   count: number;
   onLike: () => void;
   onComment?: () => void;
+  commentCount?: number;
 }) => (
   <div className="flex items-center justify-between px-4 py-3 relative">
     <div className="flex gap-4">
@@ -596,12 +635,25 @@ export const InstaActions = ({
           e.stopPropagation();
           onComment?.();
         }}
-        className="rounded-full p-1 hover:bg-white/10"
+        className="group/comment inline-flex items-center gap-1 rounded-full px-2 py-1 hover:bg-white/10 transition"
         aria-label="Comment"
       >
         <MessageCircle className="h-5 w-5" />
+        <span className="text-xs tabular-nums flex items-center h-5 leading-none">
+          <AnimatePresence initial={false} mode="popLayout">
+            <motion.span
+              key={commentCount ?? 0}
+              initial={{ y: 8, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -8, opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="block"
+            >
+              {(commentCount ?? 0) > 0 ? commentCount : ""}
+            </motion.span>
+          </AnimatePresence>
+        </span>
       </motion.button>
-
       {/* share (optional) */}
       <motion.button
         whileTap={{ scale: 0.9 }}
@@ -802,6 +854,7 @@ export const InstaPostCard = ({
   count?: number;
   onComment?: (p: ComingPost) => void; // 👈 NEW
 }) => {
+  const liveCommentCount = useCommentCount(post.id);
   const [burst, setBurst] = useState(false);
 
   const handleLike = () => {
@@ -857,7 +910,8 @@ export const InstaPostCard = ({
           liked={liked}
           count={typeof count === "number" ? count : (post.likes ?? 0)} // 👈 use parent count if given
           onLike={handleLike}
-          onComment={() => onComment?.(post)} // pass post up
+          onComment={() => onComment?.(post)}
+          commentCount={liveCommentCount}
         />
       </div>
 
@@ -891,7 +945,7 @@ export function PostModal({
   isAdmin,
   onEdit,
   onDelete,
-  onComment,  // ✅ add
+  onComment,
 }: {
   post: ComingPost | null;
   onClose: () => void;
@@ -901,8 +955,9 @@ export function PostModal({
   isAdmin?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
-  onComment?: (p: ComingPost) => void; // ✅ add
+  onComment?: (p: ComingPost) => void;
 }) {
+  const liveCommentCount = useCommentCount(post?.id);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -981,6 +1036,7 @@ export function PostModal({
                   count={count}
                   onLike={onLike}
                   onComment={() => onComment?.(post)}
+                  commentCount={post?.commentsCount ?? 0}
                 />
                 <motion.p
                   initial={{ opacity: 0, y: 6 }}
@@ -1009,11 +1065,13 @@ function CommentsModal({
   open,
   onClose,
   user,
+  onLogin, // 👈 add
 }: {
   post: ComingPost | null;
   open: boolean;
   onClose: () => void;
   user: { uid: string; displayName?: string | null; photoURL?: string | null } | null;
+  onLogin: () => void; // 👈 add
 }) {
   const [comments, setComments] = useState<
     Array<{
@@ -1031,7 +1089,7 @@ function CommentsModal({
   useEffect(() => {
     if (!open || !post) return;
     const q = query(collection(db, "posts", post.id, "comments"), orderBy("createdAt", "asc"));
-    const unsub = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(q, async (snap) => {
       const rows = snap.docs.map((d) => {
         const x = d.data() as any;
         return {
@@ -1060,7 +1118,12 @@ function CommentsModal({
         userName: user.displayName || "discord user",
         userAvatar: user.photoURL || null,
       });
+
+      await updateDoc(doc(db, "posts", post.id), { commentsCount: increment(1) });
       setInput("");
+    } catch (e) {
+      console.error("Failed to add comment or increment count:", e);
+      // optional: surface a small UI error
     } finally {
       setSending(false);
     }
@@ -1147,7 +1210,10 @@ function CommentsModal({
                 </div>
               ) : (
                 <div className="border-t border-white/10 p-3 text-xs text-white/60">
-                  You must be logged in to comment.
+                  <div className="flex items-center justify-between">
+                    <span>You must be logged in to comment.</span>
+                    <Button onClick={onLogin}>Log in</Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1324,13 +1390,8 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
 
   // when someone clicks comment on a card
   const handleCommentRequest = (p: ComingPost) => {
-    if (!user) {
-      setAuthGateOpen(true); // show the Discord login modal
-      setCommentPost(p); // remember which post they wanted to comment on
-      return;
-    }
     setCommentPost(p);
-    setCommentsOpen(true);
+    setCommentsOpen(true); // always open to view
   };
 
   // Admin state (session persisted) — single source of truth
@@ -1982,6 +2043,7 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
       {/* Discord auth gate modal (only appears when needed) */}
       <AuthGateModal
         open={authGateOpen}
+        hideCancel
         onClose={() => {
           setAuthGateOpen(false);
           // if they closed without logging in, do nothing
@@ -1997,6 +2059,7 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
         open={commentsOpen}
         onClose={() => setCommentsOpen(false)}
         user={user}
+        onLogin={() => setAuthGateOpen(true)}
       />
 
       {/* Modal mount */}

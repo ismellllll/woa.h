@@ -73,6 +73,7 @@ function usePagedPosts(pageSize = 10) {
             imageUrl: data.imageUrl || undefined,
             createdAt: data.createdAt?.toMillis?.() ?? Date.now(),
             likes: data.likes ?? 0,
+            commentsCount: data.commentsCount ?? 0,
           } as ComingPost;
         });
 
