@@ -258,6 +258,7 @@ import {
   serverTimestamp,
   onSnapshot,
   increment,
+  setDoc,
 } from "firebase/firestore";
 
 function useComingPosts() {
@@ -315,6 +316,70 @@ function useComingPosts() {
 
   return { posts, addPost, updatePost, deletePost };
 }
+
+
+// ---- Support progress (current/goal) stored in Firestore ----
+// ---- Support progress (current/goal) stored in Firestore ----
+function useSupportProgress(isAdmin: boolean) {
+  const [goal, setGoalState] = useState<number | null>(null);
+  const [current, setCurrentState] = useState<number | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    const ref = doc(db, "config", "support");
+    const unsub = onSnapshot(
+      ref,
+      async (snap) => {
+        try {
+          if (!snap.exists()) {
+            console.warn("[GRJ] config/support missing.");
+            // Seed only if admin (prevents random visitors from creating the doc)
+            if (isAdmin) {
+              await setDoc(ref, { goal: 500, current: 0 }, { merge: true });
+              console.log("[GRJ] Seeded config/support with goal=500, current=0");
+            }
+            setGoalState((g) => g ?? 500);
+            setCurrentState((c) => c ?? 0);
+          } else {
+            const d = snap.data() as { goal?: number; current?: number };
+            console.log("[GRJ] support snapshot:", d);
+            if (typeof d.goal === "number") setGoalState(d.goal);
+            if (typeof d.current === "number") setCurrentState(d.current);
+          }
+        } finally {
+          setLoading(false);
+        }
+      },
+      (err) => {
+        console.error("[GRJ] onSnapshot error:", err);
+        setLoading(false);
+      }
+    );
+    return () => unsub();
+  }, [isAdmin]);
+
+  const setGoal = async (val: number) => {
+    setGoalState(val);
+    try {
+      await setDoc(doc(db, "config", "support"), { goal: val }, { merge: true });
+    } catch (e) {
+      console.error("Failed to save goal:", e);
+    }
+  };
+
+  const setCurrent = async (val: number) => {
+    setCurrentState(val);
+    try {
+      await setDoc(doc(db, "config", "support"), { current: val }, { merge: true });
+    } catch (e) {
+      console.error("Failed to save current:", e);
+    }
+  };
+
+  return { goal: goal ?? 0, current: current ?? 0, setGoal, setCurrent, loading };
+}
+
+
 
 
 // ---- Likes (per-visitor, localStorage) ----
@@ -721,14 +786,37 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
   const [tier, setTier] = useState<"monthly" | "onetime">("monthly");
   const currentLink =
     tier === "monthly" ? cfg.paymentLinkMonthly : cfg.paymentLinkOneTime;
-  const [goal] = useState(500);
-  const [current] = useState(180);
+
+  // Admin state (session persisted) — single source of truth
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    if (typeof sessionStorage === "undefined") return false;
+    return sessionStorage.getItem("grj-admin") === "true";
+  });
+  const [adminInput, setAdminInput] = useState("");
+
+  useEffect(() => {
+    if (isAdmin && typeof sessionStorage !== "undefined") {
+      sessionStorage.setItem("grj-admin", "true");
+    }
+  }, [isAdmin]);
+
+  // Firestore-backed support progress
+  const { goal, current, setGoal, setCurrent } = useSupportProgress(isAdmin);
+
+  // Stripe (optional)
   const { stripe } = useStripeRedirect(cfg);
-    useEffect(() => {
-      console.log("Stripe loaded?", !!stripe, "Key:", cfg.publishableKey);
-    }, [stripe, cfg.publishableKey]);
-  const diagnostics = useMemo(() => runConfigTests(cfg), [cfg.publishableKey, cfg.priceMonthly, cfg.priceOneTime, cfg.successUrl, cfg.cancelUrl]);
-  const hasAllConfig = Boolean(cfg.publishableKey && cfg.priceMonthly && cfg.priceOneTime);
+  useEffect(() => {
+    console.log("Stripe loaded?", !!stripe, "Key:", cfg.publishableKey);
+  }, [stripe, cfg.publishableKey]);
+
+  // Diagnostics
+  const diagnostics = useMemo(
+    () => runConfigTests(cfg),
+    [cfg.publishableKey, cfg.priceMonthly, cfg.priceOneTime, cfg.successUrl, cfg.cancelUrl]
+  );
+  const hasAllConfig = Boolean(
+    cfg.publishableKey && cfg.priceMonthly && cfg.priceOneTime
+  );
 
   // What's Coming state
   const { posts, addPost, updatePost, deletePost } = useComingPosts();
@@ -740,19 +828,8 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
   const [errMsg, setErrMsg] = useState<string>("");
   const CAP_LIMIT = 2200;
 
-  // Admin state (session persisted)
-  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    if (typeof sessionStorage === 'undefined') return false;
-    return sessionStorage.getItem('grj-admin') === 'true';
-  });
-  const [adminInput, setAdminInput] = useState("");
-
-  useEffect(() => {
-    if (isAdmin && typeof sessionStorage !== 'undefined') sessionStorage.setItem('grj-admin', 'true');
-  }, [isAdmin]);
-
   // ---- Stealth unlock mechanics ----
-  const [showUnlock, setShowUnlock] = useState(false); // controls visibility of unlock form
+  const [showUnlock, setShowUnlock] = useState(false);
   const logoClickCount = useRef(0);
   const keyBuffer = useRef<string[]>([]);
   const TARGET_SEQ = ["g", "r", "j"];
@@ -773,9 +850,10 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
       if (keyBuffer.current.length > 6) keyBuffer.current.shift();
       if (matchSequence(keyBuffer.current, TARGET_SEQ)) setShowUnlock(true);
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
+
 
   // ---- Modal state ----
   const [selectedPost, setSelectedPost] = useState<ComingPost | null>(null);
@@ -855,7 +933,7 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
             <motion.h1 initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 90, damping: 14 }} className="text-4xl md:text-6xl font-black leading-tight">
               Fuel the <span className="bg-gradient-to-r from-indigo-300 via-white to-fuchsia-300 bg-clip-text text-transparent">GhostriderJunior</span> project
             </motion.h1>
-            <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mt-4 text-white/70 max-w-xl">No perks. No promises. If you vibe with the mission, your support keeps the lights on and the code flowing.</motion.p>
+            <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mt-4 text-white/70 max-w-xl">Support for frequent updates.</motion.p>
 
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <TierToggle value={tier} onChange={setTier} />
@@ -871,6 +949,36 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
             </div>
             <div className="mt-8 max-w-md">
               <ProgressBar current={current} goal={goal} />
+              {isAdmin && (
+                <div className="mt-3 grid gap-3 max-w-md">
+                  <label className="text-xs text-white/60">
+                    Current: {current}
+                  </label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(1, goal || 1)}
+                    value={Math.min(current, Math.max(1, goal || 1))}
+                    onChange={(e) => setCurrent(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex items-center gap-3">
+                    <label className="text-xs text-white/60">Goal:</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={goal}
+                      onChange={(e) =>
+                        setGoal(Math.max(1, Number(e.target.value) || 1))
+                      }
+                      className="w-28 rounded-md bg-black/30 border border-white/10 px-2 py-1 text-sm"
+                    />
+                  </div>
+                  <div className="text-[11px] text-white/50">
+                    Saved to Firestore at <code>config/support</code>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
