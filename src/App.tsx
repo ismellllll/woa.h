@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 // NOTE: Avoid static import of @stripe/stripe-js so the sandbox won't crash if the pkg isn't installed.
 // We'll dynamically import it inside a hook and fall back to a harmless mock in test/sandbox mode.
 import {
@@ -58,8 +58,13 @@ const Button = ({
   </motion.button>
 );
 
-const Card = ({ className = "", children }: React.PropsWithChildren<{ className?: string }>) => (
+const Card = ({
+  className = "",
+  id,
+  children,
+}: React.PropsWithChildren<{ className?: string; id?: string }>) => (
   <motion.div
+    id={id}
     initial={{ opacity: 0, y: 8, scale: 0.995 }}
     whileInView={{ opacity: 1, y: 0, scale: 1 }}
     viewport={{ once: true, amount: 0.2 }}
@@ -69,6 +74,7 @@ const Card = ({ className = "", children }: React.PropsWithChildren<{ className?
     {children}
   </motion.div>
 );
+
 const CardContent = ({ className = "", children }: React.PropsWithChildren<{ className?: string }>) => (
   <div className={`p-6 ${className}`}>{children}</div>
 );
@@ -1025,7 +1031,7 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
                         uploading ||
                         !draft.trim() ||
                         draft.length > CAP_LIMIT ||
-                        (imageUrl && !isValidUrlMaybe(imageUrl))
+                        (!!imageUrl && !isValidUrlMaybe(imageUrl))
                       }
                       className="px-6"
                     >
