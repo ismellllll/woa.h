@@ -723,7 +723,7 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
     tier === "monthly" ? cfg.paymentLinkMonthly : cfg.paymentLinkOneTime;
   const [goal] = useState(500);
   const [current] = useState(180);
-  const { stripe, redirect } = useStripeRedirect(cfg);
+  const { stripe } = useStripeRedirect(cfg);
     useEffect(() => {
       console.log("Stripe loaded?", !!stripe, "Key:", cfg.publishableKey);
     }, [stripe, cfg.publishableKey]);
@@ -784,12 +784,6 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
   const onEditSave = (id: string, caption: string, imageUrl?: string) => {
     updatePost(id, { caption, imageUrl });
     setEditingPost(null);
-  };
-
-  const handleCheckout = () => {
-    const link =
-      tier === "monthly" ? cfg.paymentLinkMonthly : cfg.paymentLinkOneTime;
-    if (link) window.location.assign(link);
   };
 
 
