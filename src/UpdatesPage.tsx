@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   collection,
@@ -163,23 +163,26 @@ export default function UpdatesPage() {
               <InstaPostCard
                 key={p.id}
                 post={p}
-                onOpen={setSelectedPost}
                 liked={likes.liked(p.id)}
+                count={p.likes ?? 0}
                 onLike={async () => {
                   const wasLiked = likes.liked(p.id);
-                  const delta = wasLiked ? -1 : 1;
+                  const delta: 1 | -1 = wasLiked ? -1 : 1;
+
+                  // optimistic UI
                   likes.toggle(p.id);
-                  bumpLike(p.id, delta); // ✅ optimistic
+                  bumpLike(p.id, delta);
 
                   try {
                     await updateDoc(doc(db, "posts", p.id), { likes: increment(delta) });
                   } catch (err) {
-                    // revert
-                    likes.toggle(p.id);
-                    bumpLike(p.id, -delta);
+                    // rollback on failure
                     console.error("Failed to update likes:", err);
+                    likes.toggle(p.id);
+                    bumpLike(p.id, delta === 1 ? -1 : 1);
                   }
                 }}
+                onOpen={setSelectedPost}
                 isAdmin={false}
                 onEdit={() => {}}
                 onDelete={() => {}}
@@ -215,7 +218,7 @@ export default function UpdatesPage() {
           onLike={async () => {
             if (!selectedPost) return;
             const wasLiked = likes.liked(selectedPost.id);
-            const delta = wasLiked ? -1 : 1;
+            const delta: 1 | -1 = wasLiked ? -1 : 1;
             likes.toggle(selectedPost.id);
             bumpLike(selectedPost.id, delta); // ✅ optimistic
             try {
