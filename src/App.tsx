@@ -763,6 +763,7 @@ export const InstaPostCard = ({
   isAdmin,
   onEdit,
   onDelete,
+  count, // 👈 NEW (optional, lets parent control the visible like count)
 }: {
   post: ComingPost;
   onOpen: (p: ComingPost) => void;
@@ -771,8 +772,10 @@ export const InstaPostCard = ({
   isAdmin: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  count?: number; // 👈 NEW
 }) => {
   const [burst, setBurst] = useState(false);
+
   const handleLike = () => {
     const wasLiked = liked;
     onLike();
@@ -781,6 +784,7 @@ export const InstaPostCard = ({
       setTimeout(() => setBurst(false), 520);
     }
   };
+
   return (
     <motion.div
       layout
@@ -791,6 +795,7 @@ export const InstaPostCard = ({
       tabIndex={0}
     >
       <InstaHeader isAdmin={isAdmin} />
+
       {isAdmin && (
         <div className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition">
           <AdminKebab
@@ -805,8 +810,8 @@ export const InstaPostCard = ({
           />
         </div>
       )}
+
       {shouldShowImage(post.imageUrl) && (
-        // eslint-disable-next-line @next/next/no-img-element
         <motion.img
           src={post.imageUrl as string}
           alt="post"
@@ -817,10 +822,16 @@ export const InstaPostCard = ({
           whileHover={{ scale: 1.03 }}
         />
       )}
+
       <div className="relative">
         <HeartBurst show={burst} />
-        <InstaActions liked={liked} count={post.likes ?? 0} onLike={handleLike} />
+        <InstaActions
+          liked={liked}
+          count={typeof count === "number" ? count : (post.likes ?? 0)} // 👈 use parent count if given
+          onLike={handleLike}
+        />
       </div>
+
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
@@ -840,6 +851,7 @@ export const InstaPostCard = ({
     </motion.div>
   );
 };
+
 
 // ---- Modal for enlarged post ----
 export function PostModal({

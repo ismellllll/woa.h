@@ -225,7 +225,7 @@ export default function UpdatesPage() {
               await updateDoc(doc(db, "posts", selectedPost.id), { likes: increment(delta) });
             } catch (err) {
               likes.toggle(selectedPost.id);
-              bumpLike(selectedPost.id, -delta);
+              bumpLike(selectedPost.id, delta === 1 ? -1 : 1);
               console.error("Failed to update likes:", err);
             }
           }}
