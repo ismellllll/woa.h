@@ -2,6 +2,8 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getAuth, OAuthProvider } from "firebase/auth";
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyD_n7YhROmVMy31n9FknlsvhG9E8ZzJSTY",
@@ -15,5 +17,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const storage = getStorage(app); // 👈 add this line
-
+export const auth = getAuth(app);
+export const discordProvider = new OAuthProvider("oidc.discord");
+discordProvider.setCustomParameters({ prompt: "consent" });
 

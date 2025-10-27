@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAuthUser, AuthGateModal } from "./auth";
 import { motion, AnimatePresence } from "framer-motion";
 // NOTE: Avoid static import of @stripe/stripe-js so the sandbox won't crash if the pkg isn't installed.
 // We'll dynamically import it inside a hook and fall back to a harmless mock in test/sandbox mode.
@@ -23,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+
 const MotionLink = motion(Link);
 
 /**
@@ -547,17 +549,20 @@ function HeartBurst({ show }: { show: boolean }) {
   );
 }
 
-const InstaActions = ({
+export const InstaActions = ({
   liked,
   count,
   onLike,
+  onComment,
 }: {
   liked: boolean;
   count: number;
   onLike: () => void;
+  onComment?: () => void;
 }) => (
   <div className="flex items-center justify-between px-4 py-3 relative">
     <div className="flex gap-4">
+      {/* like */}
       <motion.button
         onClick={(e) => {
           e.stopPropagation();
@@ -583,16 +588,37 @@ const InstaActions = ({
           </AnimatePresence>
         </span>
       </motion.button>
-      <motion.div whileTap={{ scale: 0.9 }}>
+
+      {/* comment */}
+      <motion.button
+        whileTap={{ scale: 0.9 }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onComment?.();
+        }}
+        className="rounded-full p-1 hover:bg-white/10"
+        aria-label="Comment"
+      >
         <MessageCircle className="h-5 w-5" />
-      </motion.div>
-      <motion.div whileTap={{ scale: 0.9 }}>
+      </motion.button>
+
+      {/* share (optional) */}
+      <motion.button
+        whileTap={{ scale: 0.9 }}
+        className="rounded-full p-1 hover:bg-white/10"
+        aria-label="Share"
+      >
         <Send className="h-5 w-5" />
-      </motion.div>
+      </motion.button>
     </div>
-    <motion.div whileTap={{ scale: 0.9 }}>
+
+    <motion.button
+      whileTap={{ scale: 0.9 }}
+      className="rounded-full p-1 hover:bg-white/10"
+      aria-label="Save"
+    >
       <Bookmark className="h-5 w-5" />
-    </motion.div>
+    </motion.button>
   </div>
 );
 
@@ -763,7 +789,8 @@ export const InstaPostCard = ({
   isAdmin,
   onEdit,
   onDelete,
-  count, // 👈 NEW (optional, lets parent control the visible like count)
+  count,
+  onComment, // 👈 NEW (optional, lets parent control the visible like count)
 }: {
   post: ComingPost;
   onOpen: (p: ComingPost) => void;
@@ -772,7 +799,8 @@ export const InstaPostCard = ({
   isAdmin: boolean;
   onEdit: () => void;
   onDelete: () => void;
-  count?: number; // 👈 NEW
+  count?: number;
+  onComment?: (p: ComingPost) => void; // 👈 NEW
 }) => {
   const [burst, setBurst] = useState(false);
 
@@ -829,6 +857,7 @@ export const InstaPostCard = ({
           liked={liked}
           count={typeof count === "number" ? count : (post.likes ?? 0)} // 👈 use parent count if given
           onLike={handleLike}
+          onComment={() => onComment?.(post)} // pass post up
         />
       </div>
 
@@ -852,7 +881,6 @@ export const InstaPostCard = ({
   );
 };
 
-
 // ---- Modal for enlarged post ----
 export function PostModal({
   post,
@@ -863,6 +891,7 @@ export function PostModal({
   isAdmin,
   onEdit,
   onDelete,
+  onComment,  // ✅ add
 }: {
   post: ComingPost | null;
   onClose: () => void;
@@ -872,6 +901,7 @@ export function PostModal({
   isAdmin?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
+  onComment?: (p: ComingPost) => void; // ✅ add
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -946,7 +976,12 @@ export function PostModal({
                 />
               )}
               <div className="px-4 pb-5">
-                <InstaActions liked={liked} count={count} onLike={onLike} />
+                <InstaActions
+                  liked={liked}
+                  count={count}
+                  onLike={onLike}
+                  onComment={() => onComment?.(post)}
+                />
                 <motion.p
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -962,6 +997,160 @@ export function PostModal({
                 </div>
               </div>
             </motion.div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function CommentsModal({
+  post,
+  open,
+  onClose,
+  user,
+}: {
+  post: ComingPost | null;
+  open: boolean;
+  onClose: () => void;
+  user: { uid: string; displayName?: string | null; photoURL?: string | null } | null;
+}) {
+  const [comments, setComments] = useState<
+    Array<{
+      id: string;
+      text: string;
+      createdAt: number;
+      userId: string;
+      userName?: string;
+      userAvatar?: string;
+    }>
+  >([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (!open || !post) return;
+    const q = query(collection(db, "posts", post.id, "comments"), orderBy("createdAt", "asc"));
+    const unsub = onSnapshot(q, (snap) => {
+      const rows = snap.docs.map((d) => {
+        const x = d.data() as any;
+        return {
+          id: d.id,
+          text: x.text ?? "",
+          createdAt: x.createdAt?.toMillis?.() ?? Date.now(),
+          userId: x.userId ?? "",
+          userName: x.userName ?? "anonymous",
+          userAvatar: x.userAvatar ?? "",
+        };
+      });
+      setComments(rows);
+    });
+    return () => unsub();
+  }, [open, post]);
+
+  const send = async () => {
+    const txt = input.trim();
+    if (!post || !txt || sending || !user) return;
+    setSending(true);
+    try {
+      await addDoc(collection(db, "posts", post.id, "comments"), {
+        text: txt,
+        createdAt: serverTimestamp(),
+        userId: user.uid,
+        userName: user.displayName || "discord user",
+        userAvatar: user.photoURL || null,
+      });
+      setInput("");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {open && post && (
+        <motion.div
+          className="fixed inset-0 z-[60]"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            onClick={onClose}
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          />
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            className="absolute inset-0 flex items-center justify-center p-4"
+            initial={{ scale: 0.96, opacity: 0, y: 12 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.98, opacity: 0, y: 8 }}
+            transition={{ type: "spring", stiffness: 160, damping: 20 }}
+          >
+            <div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-zinc-900 overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                <div className="text-sm font-semibold">Comments</div>
+                <button
+                  onClick={onClose}
+                  className="h-8 w-8 grid place-items-center rounded-full bg-white/10 hover:bg-white/20"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="max-h-[60vh] overflow-y-auto p-4 space-y-3">
+                {comments.length === 0 && (
+                  <div className="text-sm text-white/60">No comments yet. Be the first!</div>
+                )}
+                {comments.map((c) => (
+                  <div key={c.id} className="flex gap-3">
+                    {c.userAvatar ? (
+                      <img
+                        src={c.userAvatar}
+                        alt=""
+                        className="h-8 w-8 rounded-full border border-white/10"
+                      />
+                    ) : (
+                      <div className="h-8 w-8 rounded-full bg-white/10" />
+                    )}
+                    <div>
+                      <div className="text-xs text-white/70">
+                        <span className="font-semibold">{c.userName}</span>{" "}
+                        <span className="text-white/40">
+                          • {new Date(c.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="text-sm mt-1">{c.text}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* input row (only if authed) */}
+              {user ? (
+                <div className="border-t border-white/10 p-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      placeholder="Add a comment…"
+                      className="flex-1 rounded-2xl bg-black/30 border border-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-white/20"
+                    />
+                    <Button disabled={!input.trim() || sending} onClick={send}>
+                      {sending ? "Sending…" : "Send"}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="border-t border-white/10 p-3 text-xs text-white/60">
+                  You must be logged in to comment.
+                </div>
+              )}
+            </div>
           </motion.div>
         </motion.div>
       )}
@@ -1116,6 +1305,33 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
   const cfg = resolveConfig(props);
   const [tier, setTier] = useState<"monthly" | "onetime">("monthly");
   const currentLink = tier === "monthly" ? cfg.paymentLinkMonthly : cfg.paymentLinkOneTime;
+
+  // auth state (Discord via your ./auth)
+  const auth = typeof useAuthUser === "function" ? useAuthUser() : null;
+  const user = auth?.user ?? null;
+  const [authGateOpen, setAuthGateOpen] = useState(false);
+
+  // comments modal state
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentPost, setCommentPost] = useState<ComingPost | null>(null);
+
+  useEffect(() => {
+    if (authGateOpen && user && commentPost) {
+      setAuthGateOpen(false);
+      setCommentsOpen(true);
+    }
+  }, [authGateOpen, user, commentPost]);
+
+  // when someone clicks comment on a card
+  const handleCommentRequest = (p: ComingPost) => {
+    if (!user) {
+      setAuthGateOpen(true); // show the Discord login modal
+      setCommentPost(p); // remember which post they wanted to comment on
+      return;
+    }
+    setCommentPost(p);
+    setCommentsOpen(true);
+  };
 
   // Admin state (session persisted) — single source of truth
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
@@ -1662,6 +1878,7 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
                 isAdmin={isAdmin}
                 onEdit={() => setEditingPost(p)}
                 onDelete={() => deletePost(p.id)}
+                onComment={() => handleCommentRequest(p)}
               />
             ))}
           </div>
@@ -1762,6 +1979,26 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
         </footer>
       </div>
 
+      {/* Discord auth gate modal (only appears when needed) */}
+      <AuthGateModal
+        open={authGateOpen}
+        onClose={() => {
+          setAuthGateOpen(false);
+          // if they closed without logging in, do nothing
+          if (!user) return;
+          // if user logged in successfully, open comments for the remembered post
+          if (commentPost) setCommentsOpen(true);
+        }}
+      />
+
+      {/* Comments modal */}
+      <CommentsModal
+        post={commentPost}
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        user={user}
+      />
+
       {/* Modal mount */}
       <PostModal
         post={selectedPost}
@@ -1785,6 +2022,7 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
         isAdmin={isAdmin}
         onEdit={() => selectedPost && setEditingPost(selectedPost)}
         onDelete={() => selectedPost && deletePost(selectedPost.id)}
+        onComment={(p) => handleCommentRequest(p)}
       />
 
       {/* Edit modal mount (only for admins) */}
