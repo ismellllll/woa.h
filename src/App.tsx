@@ -38,6 +38,12 @@ import {
  * Config can be provided via props, window.__GRJ_CONFIG, or <meta> tags.
  */
 
+const CLOUDINARY = {
+  cloudName: "dpzvp40au",      // e.g. "d3abcxyz"
+  uploadPreset: "noseee", // e.g. "posts_unsigned"
+};
+
+
 // ---- Lightweight UI primitives ----
 const Button = ({
   className = "",
@@ -89,6 +95,8 @@ export type GhostRiderConfig = {
   /** Admin password/key used to unlock the What's Coming editor (client-side gate). */
   adminKey?: string;
   adminPassword?: string;
+  paymentLinkMonthly?: string;
+  paymentLinkOneTime?: string;
 };
 
 function getMeta(name: string): string | undefined {
@@ -108,6 +116,8 @@ function resolveConfig(props: GhostRiderConfig): Required<GhostRiderConfig> | Gh
     cancelUrl: getMeta("grj-cancel-url"),
     adminKey: getMeta("grj-admin-key"),
     adminPassword: getMeta("grj-admin-password"),
+    paymentLinkMonthly: getMeta("grj-link-monthly"),
+    paymentLinkOneTime: getMeta("grj-link-onetime"),
   };
 
   const cfg: GhostRiderConfig = {
@@ -118,16 +128,9 @@ function resolveConfig(props: GhostRiderConfig): Required<GhostRiderConfig> | Gh
     cancelUrl: fromProps.cancelUrl || fromGlobal.cancelUrl || fromMeta.cancelUrl || "https://ghostriderjunior.com/cancel",
     adminKey: fromProps.adminKey || fromGlobal.adminKey || fromMeta.adminKey,
     adminPassword: fromProps.adminPassword || fromGlobal.adminPassword || fromMeta.adminPassword,
+    paymentLinkMonthly: fromProps.paymentLinkMonthly || fromGlobal.paymentLinkMonthly || fromMeta.paymentLinkMonthly,
+    paymentLinkOneTime: fromProps.paymentLinkOneTime || fromGlobal.paymentLinkOneTime || fromMeta.paymentLinkOneTime,
   };
-
-  // For sandbox/testing: hard-code your test publishable key if none provided.
-  if (!cfg.publishableKey)
-    cfg.publishableKey = "pk_test_51SMbhAE3NHX86eVQJD6GrscDXHHCUShsxS4S1RsPyktcm8oGwqI3IEytnN7D3zT5wiCGku4c7Twv3lOrxB956rMu00E1drsjzH";
-
-  // Provide test price IDs in sandbox so diagnostics/tests pass without env wiring.
-  if (!cfg.priceMonthly) cfg.priceMonthly = "price_TEST_MONTHLY";
-  if (!cfg.priceOneTime) cfg.priceOneTime = "price_TEST_ONETIME";
-
   return cfg;
 }
 
@@ -238,9 +241,10 @@ export type ComingPost = {
   createdAt: number; // epoch ms
   /** optional seed for initial like count (client-only, no server) */
   initialLikes?: number;
+  likes?: number; 
 };
 
-const AVATAR_URL = "https://api.dicebear.com/7.x/identicon/svg?seed=GhostRiderJunior"; // replace with your logo if desired
+const AVATAR_URL = "https://cdn.discordapp.com/avatars/271381222184321025/d8c4d7af7ba2973e427ce6ba83662df6.png?size=1024"; // replace with your logo if desired
 
 import { db } from "./firebase";
 import {
@@ -253,6 +257,7 @@ import {
   orderBy,
   serverTimestamp,
   onSnapshot,
+  increment,
 } from "firebase/firestore";
 
 function useComingPosts() {
@@ -269,6 +274,7 @@ function useComingPosts() {
           caption: docData.caption,
           imageUrl: docData.imageUrl || undefined,
           createdAt: docData.createdAt?.toMillis?.() ?? Date.now(),
+          likes: docData.likes ?? 0, // ✅ add this
         };
       }) as ComingPost[];
       setPosts(data);
@@ -284,6 +290,7 @@ function useComingPosts() {
         caption: p.caption,
         imageUrl: isHttpUrl(p.imageUrl) ? p.imageUrl : null,
         createdAt: serverTimestamp(),
+        likes: 0, // ✅ new field
       });
     } catch (err) {
       console.error("Firestore addDoc failed:", err);
@@ -342,7 +349,7 @@ function useLikes() {
   return { liked, count, toggle };
 }
 
-const InstaHeader = () => (
+const InstaHeader = ({ isAdmin = false }: { isAdmin?: boolean }) => (
   <div className="flex items-center justify-between px-4 py-3">
     <div className="flex items-center gap-3">
       <img src={AVATAR_URL} alt="grj avatar" className="h-8 w-8 rounded-full ring-1 ring-white/10" />
@@ -351,9 +358,10 @@ const InstaHeader = () => (
         <div className="text-[10px] text-white/60">Official updates</div>
       </div>
     </div>
-    <MoreHorizontal className="h-5 w-5 text-white/70" />
+    {isAdmin && <MoreHorizontal className="h-5 w-5 text-white/70" />}
   </div>
 );
+
 
 // Like burst particles
 function HeartBurst({ show }: { show: boolean }) {
@@ -497,7 +505,7 @@ function EditPostModal({ post, onClose, onSave }: { post: ComingPost | null; onC
   );
 }
 
-const InstaPostCard = ({ post, onOpen, liked, count, onLike, isAdmin, onEdit, onDelete }: { post: ComingPost; onOpen: (p: ComingPost) => void; liked: boolean; count: number; onLike: () => void; isAdmin: boolean; onEdit: () => void; onDelete: () => void }) => {
+const InstaPostCard = ({ post, onOpen, liked, onLike, isAdmin, onEdit, onDelete }: { post: ComingPost; onOpen: (p: ComingPost) => void; liked: boolean; onLike: () => void; isAdmin: boolean; onEdit: () => void; onDelete: () => void }) => {
   const [burst, setBurst] = useState(false);
   const handleLike = () => {
     const wasLiked = liked;
@@ -508,13 +516,15 @@ const InstaPostCard = ({ post, onOpen, liked, count, onLike, isAdmin, onEdit, on
     }
   };
   return (
-    <motion.button
+    <motion.div
       layout
       onClick={() => onOpen(post)}
       whileHover={{ y: -2 }}
       className="group text-left rounded-3xl overflow-hidden border border-white/10 bg-white/5 backdrop-blur focus:outline-none focus:ring-2 focus:ring-white/20 relative"
+      role="button"
+      tabIndex={0}
     >
-      <InstaHeader />
+      <InstaHeader isAdmin={isAdmin} />
       {isAdmin && (
         <div className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition">
           <AdminKebab onEdit={(e)=>{e.stopPropagation(); onEdit();}} onDelete={(e)=>{e.stopPropagation(); onDelete();}} />
@@ -534,7 +544,7 @@ const InstaPostCard = ({ post, onOpen, liked, count, onLike, isAdmin, onEdit, on
       )}
       <div className="relative">
         <HeartBurst show={burst} />
-        <InstaActions liked={liked} count={count} onLike={handleLike} />
+        <InstaActions liked={liked} count={post.likes ?? 0} onLike={handleLike} />
       </div>
       <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="px-4 pb-4">
         <p className="text-sm">
@@ -543,7 +553,7 @@ const InstaPostCard = ({ post, onOpen, liked, count, onLike, isAdmin, onEdit, on
         </p>
         <div className="mt-2 text-[10px] uppercase tracking-wide text-white/40">{new Date(post.createdAt).toLocaleString()}</div>
       </motion.div>
-    </motion.button>
+    </motion.div>
   );
 };
 
@@ -570,13 +580,13 @@ function PostModal({ post, onClose, liked, count, onLike, isAdmin, onEdit, onDel
             transition={{ type: "spring", stiffness: 120, damping: 14 }}
           >
             <motion.div layout className="relative max-w-3xl w-full rounded-3xl overflow-hidden border border-white/10 bg-zinc-900">
-              <motion.button whileTap={{ scale: 0.9 }} onClick={onClose} className="absolute top-3 right-3 h-9 w-9 grid place-items-center rounded-full bg-white/10 backdrop-blur hover:bg-white/20">
+              <motion.button whileTap={{ scale: 0.9 }} onClick={onClose} className="absolute top-3 right-3 z-50 h-9 w-9 grid place-items-center rounded-full bg-white/10 backdrop-blur hover:bg-white/20">
                 <X className="h-5 w-5" />
               </motion.button>
               <div className="relative">
-                <InstaHeader />
+                <InstaHeader isAdmin={isAdmin} />
                 {isAdmin && (
-                  <div className="absolute top-3 right-3 z-10">
+                  <div className="absolute top-3 right-14 z-40">
                     <AdminKebab onEdit={(e)=>{e.stopPropagation(); onEdit && onEdit();}} onDelete={(e)=>{e.stopPropagation(); onDelete && onDelete();}} />
                   </div>
                 )}
@@ -616,7 +626,7 @@ async function loadStripeSafely(publishableKey: string): Promise<StripeLike> {
   try {
     // Dynamically import @stripe/stripe-js if available
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod: any = await import(/* webpackIgnore: true */ "@stripe/stripe-js").catch(() => null);
+    const mod: any = await import("@stripe/stripe-js").catch(() => null);
     if (!mod || !mod.loadStripe) return null;
     const stripe = await mod.loadStripe(publishableKey);
     return (stripe as StripeLike) || null;
@@ -709,9 +719,14 @@ function Feature({ icon: Icon, title, text }: { icon: React.ComponentType<{ clas
 export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
   const cfg = resolveConfig(props);
   const [tier, setTier] = useState<"monthly" | "onetime">("monthly");
+  const currentLink =
+    tier === "monthly" ? cfg.paymentLinkMonthly : cfg.paymentLinkOneTime;
   const [goal] = useState(500);
   const [current] = useState(180);
   const { stripe, redirect } = useStripeRedirect(cfg);
+    useEffect(() => {
+      console.log("Stripe loaded?", !!stripe, "Key:", cfg.publishableKey);
+    }, [stripe, cfg.publishableKey]);
   const diagnostics = useMemo(() => runConfigTests(cfg), [cfg.publishableKey, cfg.priceMonthly, cfg.priceOneTime, cfg.successUrl, cfg.cancelUrl]);
   const hasAllConfig = Boolean(cfg.publishableKey && cfg.priceMonthly && cfg.priceOneTime);
 
@@ -771,13 +786,10 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
     setEditingPost(null);
   };
 
-  const handleCheckout = async () => {
-    if (!hasAllConfig) return;
-    if (tier === "monthly" && cfg.priceMonthly) {
-      await redirect({ price: cfg.priceMonthly, mode: "subscription", successUrl: cfg.successUrl!, cancelUrl: cfg.cancelUrl! });
-    } else if (tier === "onetime" && cfg.priceOneTime) {
-      await redirect({ price: cfg.priceOneTime, mode: "payment", successUrl: cfg.successUrl!, cancelUrl: cfg.cancelUrl! });
-    }
+  const handleCheckout = () => {
+    const link =
+      tier === "monthly" ? cfg.paymentLinkMonthly : cfg.paymentLinkOneTime;
+    if (link) window.location.assign(link);
   };
 
 
@@ -853,13 +865,16 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
 
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <TierToggle value={tier} onChange={setTier} />
-              <Button onClick={handleCheckout} disabled={!hasAllConfig || !stripe} className="rounded-2xl px-6 py-6 text-base font-semibold">
+              <Button
+                onClick={() => currentLink && window.location.assign(currentLink)}
+                disabled={!currentLink}
+                className="rounded-2xl px-6 py-6 text-base font-semibold"
+              >
                 <CreditCard className="mr-2 h-5 w-5" />
                 {tier === "monthly" ? "Support Monthly" : "One-time Support"}
               </Button>
               <span className="text-xs text-white/60">Secure checkout via Stripe</span>
             </div>
-
             <div className="mt-8 max-w-md">
               <ProgressBar current={current} goal={goal} />
             </div>
@@ -879,7 +894,13 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
                       <p className="text-sm text-white/70">Monthly Backer</p>
                       <h3 className="text-2xl font-bold tracking-tight">$5<span className="text-white/60 text-base">/mo</span></h3>
                     </div>
-                    <Button className="rounded-xl" disabled={!cfg.priceMonthly || !stripe} onClick={() => cfg.priceMonthly && redirect({ price: cfg.priceMonthly, mode: "subscription", successUrl: cfg.successUrl!, cancelUrl: cfg.cancelUrl! })}>
+                    <Button
+                      className="rounded-xl"
+                      disabled={!cfg.paymentLinkMonthly}
+                      onClick={() =>
+                        cfg.paymentLinkMonthly && window.location.assign(cfg.paymentLinkMonthly)
+                      }
+                    >
                       <Zap className="mr-2 h-4 w-4" /> Subscribe
                     </Button>
                   </div>
@@ -896,7 +917,13 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
                       <p className="text-sm text-white/70">One-time Support</p>
                       <h3 className="text-2xl font-bold tracking-tight">$25</h3>
                     </div>
-                    <Button className="rounded-xl" disabled={!cfg.priceOneTime || !stripe} onClick={() => cfg.priceOneTime && redirect({ price: cfg.priceOneTime, mode: "payment", successUrl: cfg.successUrl!, cancelUrl: cfg.cancelUrl! })}>
+                    <Button
+                      className="rounded-xl"
+                      disabled={!cfg.paymentLinkOneTime}
+                      onClick={() =>
+                        cfg.paymentLinkOneTime && window.location.assign(cfg.paymentLinkOneTime)
+                      }
+                    >
                       <DollarSign className="mr-2 h-4 w-4" /> Donate
                     </Button>
                   </div>
@@ -914,9 +941,9 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
 
         {/* Features */}
         <section id="features" className="mt-24 grid gap-6 md:grid-cols-3">
-          <Feature icon={Zap} title="Support (no strings)" text="This project accepts support without promising rewards — contributions help maintain infrastructure and development. No entitlement is implied." />
-          <Feature icon={InfinityIcon} title="Open Development" text="Work is open-source and progress is shared. Supporters help fund work but do not automatically receive paid features." />
-          <Feature icon={Shield} title="Transparent Stewardship" text="We treat funds responsibly and share progress; donations do not create contractual obligations or perks by default." />
+          <Feature icon={Zap} title="Support (no strings)" text="000000000." />
+          <Feature icon={InfinityIcon} title="Open arms" text="im treating the funds responsibily" />
+          <Feature icon={Shield} title="oh" text="We treat funds responsibly" />
         </section>
 
         {/* What's Coming (Instagram-like feed + editor) */}
@@ -969,57 +996,97 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
                       <div className="mt-2 flex items-center justify-between text-xs text-white/60">
                         <div className="flex items-center gap-2">
                           <ImageIcon className="h-4 w-4" />
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
 
-                              // show a local preview instantly
-                              const preview = URL.createObjectURL(file);
-                              setImageUrl(preview);
+                          // show a quick local preview
+                          const preview = URL.createObjectURL(file);
+                          setImageUrl(preview);
 
-                              setUploading(true);
-                              try {
-                                const storageMod = await import("firebase/storage");
-                                const { storage } = await import("./firebase");
+                          setUploading(true);
+                          setErrMsg("");
 
-                                const storageRef = storageMod.ref(storage, `posts/${Date.now()}_${file.name}`);
-                                const task = storageMod.uploadBytesResumable(storageRef, file, {
-                                  cacheControl: "public,max-age=31536000,immutable",
-                                });
+                          try {
+                            // 🧼 strip EXIF + GPS metadata before upload
+                            async function stripImageMetadata(file: File): Promise<File> {
+                              const dataUrl = await new Promise<string>((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = () => resolve(reader.result as string);
+                                reader.onerror = reject;
+                                reader.readAsDataURL(file);
+                              });
 
-                                // 45s client-side timeout so it never hangs forever
-                                await new Promise<void>((resolve, reject) => {
-                                  const t = setTimeout(() => {
-                                    try { task.cancel(); } catch {}
-                                    reject(new Error("Upload timed out"));
-                                  }, 45_000);
+                              const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+                                const i = new Image();
+                                i.onload = () => resolve(i);
+                                i.onerror = reject;
+                                i.src = dataUrl;
+                              });
 
-                                  task.on(
-                                    "state_changed",
-                                    undefined, // progress handler optional
-                                    (err) => { clearTimeout(t); reject(err); },
-                                    async () => {
-                                      clearTimeout(t);
-                                      const url = await storageMod.getDownloadURL(task.snapshot.ref);
-                                      setImageUrl(url); // final HTTPS URL
-                                      resolve();
-                                    }
-                                  );
-                                });
-                              } catch (err) {
-                                console.error("Upload failed:", err);
-                                setImageUrl("");
-                              } finally {
-                                setUploading(false);
-                              }
-                            }}
-                            className="w-64 rounded-xl bg-black/30 border border-white/10 px-2 py-1 outline-none focus:ring-2 focus:ring-white/20"
-                          />
+                              const canvas = document.createElement("canvas");
+                              canvas.width = img.naturalWidth;
+                              canvas.height = img.naturalHeight;
+                              const ctx = canvas.getContext("2d")!;
+                              ctx.drawImage(img, 0, 0);
+
+                              const blob: Blob = await new Promise((resolve) =>
+                                canvas.toBlob((b) => resolve(b!), "image/jpeg", 0.92)
+                              );
+
+                              return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", {
+                                type: "image/jpeg",
+                              });
+                            }
+
+                            const cleaned = await stripImageMetadata(file);
+
+                            const form = new FormData();
+                            form.append("file", cleaned);
+                            form.append("upload_preset", CLOUDINARY.uploadPreset);
+
+                            const controller = new AbortController();
+                            const timeout = setTimeout(() => controller.abort(), 45000); // 45s timeout
+
+                            const res = await fetch(
+                              `https://api.cloudinary.com/v1_1/${CLOUDINARY.cloudName}/image/upload`,
+                              { method: "POST", body: form, signal: controller.signal }
+                            );
+
+                            clearTimeout(timeout);
+
+                            if (!res.ok) {
+                              const text = await res.text().catch(() => "");
+                              throw new Error(`Cloudinary upload failed: ${res.status} ${text}`);
+                            }
+
+                            const data = await res.json();
+                            if (!data.secure_url) throw new Error("No secure_url returned");
+
+                            setImageUrl(data.secure_url); // ✅ real https URL (EXIF-free)
+                            URL.revokeObjectURL(preview);
+                          } catch (err) {
+                            console.error(err);
+                            setErrMsg("Image upload failed. Try another image.");
+                            setImageUrl(""); // drop preview if failed
+                          } finally {
+                            setUploading(false);
+                          }
+                        }}
+                        className="w-64 rounded-xl bg-black/30 border border-white/10 px-2 py-1 outline-none focus:ring-2 focus:ring-white/20"
+                      />
+
+                          {imageUrl && isValidUrlMaybe(imageUrl) && (
+                            <img
+                              src={imageUrl}
+                              alt="preview"
+                              className="mt-2 max-h-40 rounded-xl border border-white/10 object-cover"
+                            />
+                          )}
                         </div>
-
                         <div>{draft.length} / {CAP_LIMIT}</div>
                       </div>
                     </div>
@@ -1058,8 +1125,20 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
                 post={p}
                 onOpen={setSelectedPost}
                 liked={likes.liked(p.id)}
-                count={likes.count(p.id)}
-                onLike={() => likes.toggle(p.id)}
+                onLike={async () => {
+                  const wasLiked = likes.liked(p.id);
+                  likes.toggle(p.id);                      
+                  try {
+                    await updateDoc(doc(db, "posts", p.id), {
+                      likes: increment(wasLiked ? -1 : 1),
+                    });
+                  } catch (err) {
+                    // revert local toggle if the write fails
+                    likes.toggle(p.id);
+                    console.error("Failed to update likes:", err);
+                  }
+                }}
+
                 isAdmin={isAdmin}
                 onEdit={() => setEditingPost(p)}
                 onDelete={() => deletePost(p.id)}
@@ -1130,19 +1209,41 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
         post={selectedPost}
         onClose={() => setSelectedPost(null)}
         liked={selectedPost ? likes.liked(selectedPost.id) : false}
-        count={selectedPost ? likes.count(selectedPost.id) : 0}
-        onLike={() => selectedPost && likes.toggle(selectedPost.id)}
+        count={
+          selectedPost
+            ? (posts.find(p => p.id === selectedPost.id)?.likes ?? 0)
+            : 0
+        }
+        onLike={async () => {
+          if (!selectedPost) return;
+          const wasLiked = likes.liked(selectedPost.id);
+          likes.toggle(selectedPost.id);
+          try {
+            await updateDoc(doc(db, "posts", selectedPost.id), {
+              likes: increment(wasLiked ? -1 : 1),
+            });
+          } catch (err) {
+            // revert local toggle if the write fails
+            likes.toggle(selectedPost.id);
+            console.error("Failed to update likes:", err);
+          }
+        }}
         isAdmin={isAdmin}
         onEdit={() => selectedPost && setEditingPost(selectedPost)}
         onDelete={() => selectedPost && deletePost(selectedPost.id)}
       />
 
-      {/* Edit modal mount */}
-      <EditPostModal
-        post={editingPost}
-        onClose={() => setEditingPost(null)}
-        onSave={(caption, image) => editingPost && onEditSave(editingPost.id, caption, image)}
-      />
+      {/* Edit modal mount (only for admins) */}
+      {isAdmin && (
+        <EditPostModal
+          post={editingPost}
+          onClose={() => setEditingPost(null)}
+          onSave={(caption, image) =>
+            editingPost && onEditSave(editingPost.id, caption, image)
+          }
+        />
+      )}
     </div>
   );
 }
+
