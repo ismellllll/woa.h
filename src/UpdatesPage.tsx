@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useAuthUser, AuthGateModal } from "./auth";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   collection,
