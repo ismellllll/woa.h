@@ -841,7 +841,7 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
             <motion.button whileTap={{ scale: 0.95 }} onClick={onLogoClick} className="h-9 w-9 grid place-items-center rounded-xl bg-white text-black font-black focus:outline-none focus:ring-2 focus:ring-white/20">
               GRJ
             </motion.button>
-            <span className="font-semibold tracking-wide text-white/90">GhostRiderJunior</span>
+            <span className="font-semibold tracking-wide text-white/90">GhostriderJunior</span>
           </div>
           <nav className="hidden md:flex items-center gap-6 text-sm text-white/70">
             {[{href:'#features',label:'Features'},{href:'#support',label:'Support'},{href:'#whats-coming',label:"What's coming"},{href:'#faq',label:'FAQ'}].map((l)=> (
@@ -859,7 +859,7 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
         <section className="relative mt-14 grid gap-8 md:grid-cols-[1.3fr_1fr] items-center">
           <div>
             <motion.h1 initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", stiffness: 90, damping: 14 }} className="text-4xl md:text-6xl font-black leading-tight">
-              Fuel the <span className="bg-gradient-to-r from-indigo-300 via-white to-fuchsia-300 bg-clip-text text-transparent">GhostRiderJunior</span> project
+              Fuel the <span className="bg-gradient-to-r from-indigo-300 via-white to-fuchsia-300 bg-clip-text text-transparent">GhostriderJunior</span> project
             </motion.h1>
             <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mt-4 text-white/70 max-w-xl">No perks. No promises. If you vibe with the mission, your support keeps the lights on and the code flowing.</motion.p>
 
@@ -1200,7 +1200,7 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
 
         {/* Footer */}
         <footer className="mt-24 border-t border-white/10 pt-8 text-xs text-white/60">
-          <p>© {new Date().getFullYear()} GhostRiderJunior. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} GhostriderJunior. All rights reserved.</p>
         </footer>
       </div>
 
