@@ -130,8 +130,31 @@ import {
   serverTimestamp,
   onSnapshot,
   increment,
+  getDoc,
   setDoc,
 } from "firebase/firestore";
+
+async function upsertUserProfile(authUser: any) {
+  const u = authUser;
+  const ref = doc(db, "users", u.uid);
+  const snap = await getDoc(ref);
+
+  const base = {
+    discordId: u.providerData?.[0]?.uid || u.discordId || null,
+    username: u.displayName || u.username || null,
+    globalName: u.globalName ?? null,
+    email: u.email ?? null,      // will be null without 'email' scope or if unverified
+    avatar: u.photoURL ?? u.avatar ?? null,
+    lastLoginAt: serverTimestamp(),
+  };
+
+  if (!snap.exists()) {
+    await setDoc(ref, { ...base, createdAt: serverTimestamp() }, { merge: true });
+  } else {
+    await setDoc(ref, base, { merge: true }); // don’t touch createdAt
+  }
+}
+
 
 function useCommentCount(postId?: string) {
   const [count, setCount] = useState(0);
@@ -1060,7 +1083,7 @@ export function PostModal({
   );
 }
 
-function CommentsModal({
+export function CommentsModal({
   post,
   open,
   onClose,
@@ -1380,6 +1403,14 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
   // comments modal state
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentPost, setCommentPost] = useState<ComingPost | null>(null);
+
+useEffect(() => {
+  if (!user?.uid) return;
+  upsertUserProfile(user).catch((e) =>
+    console.error("upsertUserProfile failed:", e)
+  );
+}, [user?.uid]);
+
 
   useEffect(() => {
     if (authGateOpen && user && commentPost) {

@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuthUser, AuthGateModal } from "./auth";
 import {
   collection,
   doc,
@@ -13,7 +14,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { InstaPostCard, PostModal } from "./App"; // reusing your components
+import { InstaPostCard, PostModal, CommentsModal } from "./App"; // reusing your components
 
 export type ComingPost = {
   id: string;
@@ -21,6 +22,7 @@ export type ComingPost = {
   imageUrl?: string;
   createdAt: number;
   likes?: number;
+  commentsCount?: number;
 };
 
 function useLikes() {
@@ -123,6 +125,19 @@ export default function UpdatesPage() {
   const { posts, loading, hasMore, loadingMore, loadMore, bumpLike } = usePagedPosts(10);
   const likes = useLikes();
   const [selectedPost, setSelectedPost] = useState<ComingPost | null>(null);
+  const auth = typeof useAuthUser === "function" ? useAuthUser() : null;
+  const user = auth?.user ?? null;
+
+  const [authGateOpen, setAuthGateOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [commentPost, setCommentPost] = useState<ComingPost | null>(null);
+
+  const openComments = (post: ComingPost) => {
+    setCommentPost(post);
+    // if you want to force login before commenting, open the gate if no user:
+    if (!user) setAuthGateOpen(true);
+    else setCommentsOpen(true);
+  };
 
   // Auto-load more when scroller hits sentinel
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -187,6 +202,10 @@ export default function UpdatesPage() {
                 isAdmin={false}
                 onEdit={() => {}}
                 onDelete={() => {}}
+                onComment={(post) => {
+                  setCommentPost(post);
+                  setCommentsOpen(true);
+                }}
               />
             ))}
         </div>
@@ -210,12 +229,33 @@ export default function UpdatesPage() {
         {/* Sentinel for auto-load */}
         <div ref={sentinelRef} className="h-10" />
 
+        {/* Discord auth gate (opens when someone tries to comment while logged out) */}
+        <AuthGateModal
+          open={authGateOpen}
+          hideCancel
+          onClose={() => {
+            setAuthGateOpen(false);
+            // if user successfully logged in via the modal, proceed to comments
+            if (user && commentPost) setCommentsOpen(true);
+          }}
+        />
+
+        {/* Comments modal */}
+        <CommentsModal
+          post={commentPost}
+          open={commentsOpen}
+          onClose={() => setCommentsOpen(false)}
+          user={user}
+          onLogin={() => setAuthGateOpen(true)} // shows the Discord login popup
+        />
+
         {/* Modal */}
         <PostModal
           post={selectedPost}
           onClose={() => setSelectedPost(null)}
           liked={selectedPost ? likes.liked(selectedPost.id) : false}
           count={selectedPost ? (posts.find((p) => p.id === selectedPost.id)?.likes ?? 0) : 0}
+          onComment={(p) => p && openComments(p)}
           onLike={async () => {
             if (!selectedPost) return;
             const wasLiked = likes.liked(selectedPost.id);
