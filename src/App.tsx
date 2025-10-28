@@ -132,6 +132,7 @@ import {
   increment,
   getDoc,
   setDoc,
+  getCountFromServer,
 } from "firebase/firestore";
 
 async function upsertUserProfile(authUser: any) {
@@ -143,7 +144,7 @@ async function upsertUserProfile(authUser: any) {
     discordId: u.providerData?.[0]?.uid || u.discordId || null,
     username: u.displayName || u.username || null,
     globalName: u.globalName ?? null,
-    email: u.email ?? null,      // will be null without 'email' scope or if unverified
+    email: u.email ?? null, // will be null without 'email' scope or if unverified
     avatar: u.photoURL ?? u.avatar ?? null,
     lastLoginAt: serverTimestamp(),
   };
@@ -154,7 +155,6 @@ async function upsertUserProfile(authUser: any) {
     await setDoc(ref, base, { merge: true }); // don’t touch createdAt
   }
 }
-
 
 function useCommentCount(postId?: string) {
   const [count, setCount] = useState(0);
@@ -373,12 +373,14 @@ function useComingPosts() {
     const unsub = onSnapshot(q, async (snap) => {
       const raw = snap.docs.map((d) => {
         const x = d.data();
+        const id = d.id;
         return {
-          id: d.id,
+          id,
           caption: x.caption,
           imageUrl: x.imageUrl || undefined,
           createdAt: x.createdAt?.toMillis?.() ?? Date.now(),
           likes: x.likes ?? 0,
+          commentsCount: backfillCache.current[id] ?? x.commentsCount ?? 0, // ⬅️ include
         } as ComingPost;
       });
       setPosts(raw);
@@ -388,10 +390,13 @@ function useComingPosts() {
         if ((p.commentsCount ?? 0) === 0 && !fetchedOnce.current.has(p.id)) {
           fetchedOnce.current.add(p.id);
           try {
+            const c = await getCountFromServer(
+              // ⬅️ add this line
+              collection(db, "posts", p.id, "comments"),
+            );
             const real = c.data().count || 0;
             if (real > 0) {
               backfillCache.current[p.id] = real;
-              // update just the UI; do not write to Firestore
               setPosts((prev) =>
                 prev.map((pp) =>
                   pp.id === p.id
@@ -1059,7 +1064,7 @@ export function PostModal({
                   count={count}
                   onLike={onLike}
                   onComment={() => onComment?.(post)}
-                  commentCount={post?.commentsCount ?? 0}
+                  commentCount={liveCommentCount ?? 0}
                 />
                 <motion.p
                   initial={{ opacity: 0, y: 6 }}
@@ -1404,13 +1409,10 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentPost, setCommentPost] = useState<ComingPost | null>(null);
 
-useEffect(() => {
-  if (!user?.uid) return;
-  upsertUserProfile(user).catch((e) =>
-    console.error("upsertUserProfile failed:", e)
-  );
-}, [user?.uid]);
-
+  useEffect(() => {
+    if (!user?.uid) return;
+    upsertUserProfile(user).catch((e) => console.error("upsertUserProfile failed:", e));
+  }, [user?.uid]);
 
   useEffect(() => {
     if (authGateOpen && user && commentPost) {
