@@ -24,7 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { SpeedInsights } from "@vercel/speed-insights/next"
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 const MotionLink = motion(Link);
 
@@ -2073,6 +2073,20 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
           <p>© {new Date().getFullYear()} GhostriderJunior. All rights reserved.</p>
         </footer>
       </div>
+
+      {/* Vercel Speed Insights */}
+      <SpeedInsights />  {/* 👈 add this here */}
+
+      {/* Discord auth gate modal (only appears when needed) */}
+      <AuthGateModal
+        open={authGateOpen}
+        hideCancel
+        onClose={() => {
+          setAuthGateOpen(false);
+          if (!user) return;
+          if (commentPost) setCommentsOpen(true);
+        }}
+      />
 
       {/* Discord auth gate modal (only appears when needed) */}
       <AuthGateModal
