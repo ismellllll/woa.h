@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { SpeedInsights } from "@vercel/speed-insights/next"
 
 const MotionLink = motion(Link);
 
