@@ -1689,13 +1689,13 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
                   </div>
                   <ul className="mt-4 space-y-2 text-sm text-white/70">
                     <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4" /> Early feature drops
+                      <CheckCircle2 className="h-4 w-4" /> Coming soon
                     </li>
                     <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4" /> Backer role on Discord
+                      <CheckCircle2 className="h-4 w-4" /> Coming soon
                     </li>
                     <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4" /> Shoutout on releases
+                      <CheckCircle2 className="h-4 w-4" /> Coming soon
                     </li>
                   </ul>
                 </div>
@@ -1713,15 +1713,15 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
                         cfg.paymentLinkOneTime && window.location.assign(cfg.paymentLinkOneTime)
                       }
                     >
-                      <DollarSign className="mr-2 h-4 w-4" /> Donate
+                      <DollarSign className="mr-2 h-4 w-4" /> Support
                     </Button>
                   </div>
                   <ul className="mt-4 space-y-2 text-sm text-white/70">
                     <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4" /> Instant supporter badge
+                      <CheckCircle2 className="h-4 w-4" /> Coming soon
                     </li>
                     <li className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4" /> Priority bug reports
+                      <CheckCircle2 className="h-4 w-4" /> Coming soon
                     </li>
                   </ul>
                 </div>
