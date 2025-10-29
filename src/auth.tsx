@@ -38,6 +38,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signInWithPopup(auth, provider);
   };
 
+  const auth = getAuth();
+  (window as any).auth = auth;
+
   const signOutFn = async () => {
     const auth = getAuth();
     await signOut(auth);
