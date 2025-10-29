@@ -23,9 +23,8 @@ import {
   Image as ImageIcon,
   X,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { SpeedInsights } from "@vercel/speed-insights/react";
-
 const MotionLink = motion(Link);
 
 /**
@@ -1253,6 +1252,8 @@ export function CommentsModal({
   );
 }
 
+
+
 // ---- Stripe hook (dynamic import + mock fallback) ----
 // Minimal type for the parts we use
 type StripeLike = { redirectToCheckout: (opts: any) => Promise<{ error?: any } | void> } | null;
@@ -1410,6 +1411,46 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentPost, setCommentPost] = useState<ComingPost | null>(null);
 
+  const navigate = useNavigate();
+  const [askOpen, setAskOpen] = useState(false);
+  const [askText, setAskText] = useState("");
+  const [askSending, setAskSending] = useState(false);
+  const openAsk = () => {
+    if (!user) {
+      setAuthGateOpen(true);
+      return;
+    }
+    setAskOpen(true);
+  };
+  const submitQuestion = async () => {
+    const txt = askText.trim();
+    if (!txt) return;
+
+  // ✅ guard for null
+  if (!user) {
+    setAuthGateOpen(true);
+    return;
+  }
+
+    setAskSending(true);
+    try {
+      await addDoc(collection(db, "questions"), {
+        text: txt,
+        createdAt: serverTimestamp(),
+        userId: user.uid,
+        userName: user.displayName || "discord user",
+        userAvatar: user.photoURL || null,
+        status: "open",
+      });
+      setAskText("");
+      setAskOpen(false);
+    } catch (e) {
+      console.error("Failed to submit question:", e);
+    } finally {
+      setAskSending(false);
+    }
+  };
+
   useEffect(() => {
     if (!user?.uid) return;
     upsertUserProfile(user).catch((e) => console.error("upsertUserProfile failed:", e));
@@ -1545,7 +1586,6 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
           className="absolute -bottom-16 -right-16 h-72 w-72 rounded-full blur-3xl bg-fuchsia-500/20"
         />
       </div>
-
       <div className="mx-auto max-w-6xl px-6 py-16">
         {/* Header */}
         <header className="flex items-center justify-between gap-4">
@@ -2011,7 +2051,17 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
 
         {/* FAQ */}
         <section id="faq" className="mt-24">
-          <h2 className="text-2xl font-bold">FAQ</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold">FAQ</h2>
+            <div className="flex gap-3">
+              <Button
+                className="!px-4 !py-2 !bg-white/20 !text-white"
+                onClick={() => navigate("/questions")}
+              >
+                Community questions
+              </Button>
+            </div>
+          </div>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
               <h3 className="font-semibold">Can I cancel my monthly support?</h3>
@@ -2073,11 +2123,63 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
           <p>© {new Date().getFullYear()} GhostriderJunior. All rights reserved.</p>
         </footer>
       </div>
-
       {/* Vercel Speed Insights */}
-      <SpeedInsights />  {/* 👈 add this here */}
+      <SpeedInsights /> {/* 👈 add this here */}
+      <AnimatePresence>
+        {askOpen && (
+          <motion.div className="fixed inset-0 z-[70]"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <motion.div onClick={() => setAskOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+            <motion.div
+              role="dialog" aria-modal="true"
+              className="absolute inset-0 flex items-center justify-center p-4"
+              initial={{ scale: 0.96, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.98, opacity: 0, y: 8 }}
+              transition={{ type: "spring", stiffness: 160, damping: 20 }}
+            >
+              <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-zinc-900 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                  <div className="text-sm font-semibold">Ask a question</div>
+                  <button onClick={() => setAskOpen(false)}
+                    className="h-8 w-8 grid place-items-center rounded-full bg-white/10 hover:bg-white/20">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="p-4">
+                  {!user ? (
+                    <div className="text-xs text-white/60 flex items-center justify-between border border-white/10 rounded-xl p-3">
+                      <span>You must be logged in to ask.</span>
+                      <Button onClick={() => setAuthGateOpen(true)}>Log in</Button>
+                    </div>
+                  ) : (
+                    <div className="grid gap-3">
+                      <textarea
+                        value={askText}
+                        onChange={(e) => setAskText(e.target.value)}
+                        placeholder="Write your question…"
+                        className="min-h-[120px] rounded-2xl bg-black/30 border border-white/10 p-3 outline-none focus:ring-2 focus:ring-white/20"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button className="!bg-white/20 !text-white" onClick={() => setAskOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button disabled={!askText.trim() || askSending} onClick={submitQuestion}>
+                          {askSending ? "Sending…" : "Submit"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* ☝️☝️ PASTED BLOCK ENDS HERE ☝️☝️ */}
 
-      {/* Discord auth gate modal (only appears when needed) */}
+      {/* Keep ONE AuthGateModal */}
       <AuthGateModal
         open={authGateOpen}
         hideCancel
@@ -2087,20 +2189,7 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
           if (commentPost) setCommentsOpen(true);
         }}
       />
-
       {/* Discord auth gate modal (only appears when needed) */}
-      <AuthGateModal
-        open={authGateOpen}
-        hideCancel
-        onClose={() => {
-          setAuthGateOpen(false);
-          // if they closed without logging in, do nothing
-          if (!user) return;
-          // if user logged in successfully, open comments for the remembered post
-          if (commentPost) setCommentsOpen(true);
-        }}
-      />
-
       {/* Comments modal */}
       <CommentsModal
         post={commentPost}
@@ -2109,7 +2198,6 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
         user={user}
         onLogin={() => setAuthGateOpen(true)}
       />
-
       {/* Modal mount */}
       <PostModal
         post={selectedPost}
@@ -2135,7 +2223,6 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
         onDelete={() => selectedPost && deletePost(selectedPost.id)}
         onComment={(p) => handleCommentRequest(p)}
       />
-
       {/* Edit modal mount (only for admins) */}
       {isAdmin && (
         <EditPostModal
