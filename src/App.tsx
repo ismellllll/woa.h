@@ -1432,6 +1432,18 @@ const submitQuestion = async () => {
     return;
   }
 
+if (!user) { setAuthGateOpen(true); return; }
+const u = user as NonNullable<typeof user>; // after guard
+await addDoc(collection(db, "questions"), {
+  text: txt,
+  createdAt: serverTimestamp(),
+  userId: u.uid,
+  userName: u.displayName || "discord user",
+  userAvatar: u.photoURL || null,
+  status: "open",
+});
+
+
   setAskSending(true);
   try {
     await addDoc(collection(db, "questions"), {
