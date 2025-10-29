@@ -1422,9 +1422,9 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
     }
     setAskOpen(true);
   };
-  const submitQuestion = async () => {
-    const txt = askText.trim();
-    if (!txt) return;
+const submitQuestion = async () => {
+  const txt = askText.trim();
+  if (!txt) return;
 
   // ✅ guard for null
   if (!user) {
@@ -1432,25 +1432,24 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
     return;
   }
 
-    setAskSending(true);
-    try {
-      await addDoc(collection(db, "questions"), {
-        text: txt,
-        createdAt: serverTimestamp(),
-        userId: user.uid,
-        userName: user.displayName || "discord user",
-        userAvatar: user.photoURL || null,
-        status: "open",
-      });
-      setAskText("");
-      setAskOpen(false);
-    } catch (e) {
-      console.error("Failed to submit question:", e);
-    } finally {
-      setAskSending(false);
-    }
-  };
-
+  setAskSending(true);
+  try {
+    await addDoc(collection(db, "questions"), {
+      text: txt,
+      createdAt: serverTimestamp(),
+      userId: user.uid,                   // safe after guard
+      userName: user.displayName || "discord user",
+      userAvatar: user.photoURL || null,
+      status: "open",
+    });
+    setAskText("");
+    setAskOpen(false);
+  } catch (e) {
+    console.error("Failed to submit question:", e);
+  } finally {
+    setAskSending(false);
+  }
+};
   useEffect(() => {
     if (!user?.uid) return;
     upsertUserProfile(user).catch((e) => console.error("upsertUserProfile failed:", e));
