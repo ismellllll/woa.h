@@ -1415,13 +1415,6 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
   const [askOpen, setAskOpen] = useState(false);
   const [askText, setAskText] = useState("");
   const [askSending, setAskSending] = useState(false);
-  const openAsk = () => {
-    if (!user) {
-      setAuthGateOpen(true);
-      return;
-    }
-    setAskOpen(true);
-  };
 const submitQuestion = async () => {
   const txt = askText.trim();
   if (!txt) return;
