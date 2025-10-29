@@ -7,6 +7,8 @@ import UpdatesPage from "./UpdatesPage";
 import { AuthProvider } from "./auth";
 import QuestionsPage from "./QuestionsPage"
 import NotFoundPage from "./NotFoundPage";
+import WebsiteChangesPage from "./WebsiteChangesPage";
+import JoinPage from "./JoinPage"; 
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -17,6 +19,8 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/updates" element={<UpdatesPage />} />
           <Route path="/questions" element={<QuestionsPage />} />
           <Route path="*" element={<NotFoundPage />} />   {/* 👈 catch-all */}
+          <Route path="/changes" element={<WebsiteChangesPage />} />
+          <Route path="/join" element={<JoinPage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

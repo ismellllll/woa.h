@@ -24,7 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { SpeedInsights } from "@vercel/speed-insights/react";
+import { SpeedInsights } from "@vercel/speed-insights/react"
 const MotionLink = motion(Link);
 
 /**
@@ -1415,34 +1415,22 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
   const [askOpen, setAskOpen] = useState(false);
   const [askText, setAskText] = useState("");
   const [askSending, setAskSending] = useState(false);
+
 const submitQuestion = async () => {
   const txt = askText.trim();
   if (!txt) return;
 
-  // ✅ guard for null
-  if (!user) {
+  if (!user) {            // single guard
     setAuthGateOpen(true);
     return;
   }
-
-if (!user) { setAuthGateOpen(true); return; }
-const u = user as NonNullable<typeof user>; // after guard
-await addDoc(collection(db, "questions"), {
-  text: txt,
-  createdAt: serverTimestamp(),
-  userId: u.uid,
-  userName: u.displayName || "discord user",
-  userAvatar: u.photoURL || null,
-  status: "open",
-});
-
 
   setAskSending(true);
   try {
     await addDoc(collection(db, "questions"), {
       text: txt,
       createdAt: serverTimestamp(),
-      userId: user.uid,                   // safe after guard
+      userId: user.uid,
       userName: user.displayName || "discord user",
       userAvatar: user.photoURL || null,
       status: "open",
@@ -1455,6 +1443,7 @@ await addDoc(collection(db, "questions"), {
     setAskSending(false);
   }
 };
+
   useEffect(() => {
     if (!user?.uid) return;
     upsertUserProfile(user).catch((e) => console.error("upsertUserProfile failed:", e));
@@ -1608,6 +1597,7 @@ await addDoc(collection(db, "questions"), {
               { href: "#features", label: "Features" },
               { href: "#support", label: "Support" },
               { href: "#whats-coming", label: "What's coming" },
+              { href: "/changes", label: "Website updates" },
               { href: "#faq", label: "FAQ" },
             ].map((l) => (
               <a key={l.href} href={l.href} className="relative hover:text-white">
@@ -1793,6 +1783,7 @@ await addDoc(collection(db, "questions"), {
         {/* What's Coming (Instagram-like feed + editor) */}
         <section id="whats-coming" className="mt-24">
           <h2 className="text-2xl font-bold">What's Coming</h2>
+
 
           {/* Editor unlock (stealth) */}
           {showUnlock && (
