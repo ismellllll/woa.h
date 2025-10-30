@@ -12,3 +12,48 @@ html, body, #root {
 body {
   background: radial-gradient(ellipse at top, #312e81, #18181b, #000);
 }
+
+/* --- GLASS + TONES (minimal) --- */
+:root{
+  --grj-ink:#eaeaf0;
+  --grj-ink-dim:#b8b9c2;
+}
+.glass{
+  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+/* Edge-only ring mask (clips any background to a thin border ring) */
+.grj-edge-mask {
+  --grj-radius: 16px;
+  --grj-thickness: 2px;
+  position: absolute;
+  inset: 0;
+  border-radius: var(--grj-radius);
+  padding: var(--grj-thickness);
+  box-sizing: border-box;              /* ← add */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  filter:
+    drop-shadow(0 0 10px rgba(255,255,255,0.28))
+    drop-shadow(0 0 18px rgba(170,195,255,0.16));
+}
+
+
+/* Optional: a barely-there static sheen so it doesn't look dead when idle */
+.grj-prism-sheen {
+  background: conic-gradient(from 180deg at 50% 50%, 
+    rgba(255,255,255,0.05), 
+    rgba(255,255,255,0.00) 25%, 
+    rgba(255,255,255,0.06) 50%, 
+    rgba(255,255,255,0.00) 75%, 
+    rgba(255,255,255,0.05));
+  filter: blur(10px);
+  opacity: .35;
+}

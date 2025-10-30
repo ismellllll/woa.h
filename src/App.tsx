@@ -24,7 +24,9 @@ import {
   X,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { SpeedInsights } from "@vercel/speed-insights/react"
+import { SpeedInsights } from "@vercel/speed-insights/react";
+import GlassNav from "./ui/GlassNav";
+
 const MotionLink = motion(Link);
 
 /**
@@ -48,7 +50,7 @@ const CLOUDINARY = {
   uploadPreset: "noseee", // e.g. "posts_unsigned"
 };
 
-const MAX_HOME_UPDATES = 4; // show 4 on homepage
+const MAX_HOME_UPDATES = 6; // show 6 on homepage
 
 // ---- Lightweight UI primitives ----
 const Button = ({
@@ -270,73 +272,6 @@ function runConfigTests(cfg: GhostRiderConfig) {
   });
   if (typeof window !== "undefined") {
     console.groupCollapsed("GRJ config tests");
-    results.forEach((r) =>
-      console[r.pass ? "log" : "error"](
-        `${r.pass ? "✔" : "✖"} ${r.name}${r.message ? ` – ${r.message}` : ""}`,
-      ),
-    );
-    console.groupEnd();
-  }
-  return results;
-}
-
-// ---- UI self-tests ----
-function runPostTests() {
-  const results: { name: string; pass: boolean; message?: string }[] = [];
-  const tooLong = "x".repeat(2300);
-  results.push({
-    name: "Caption length capped (<= 2200)",
-    pass: tooLong.slice(0, 2200).length === 2200,
-  });
-  results.push({
-    name: "URL validator accepts http(s) & empty",
-    pass: isValidUrlMaybe("https://example.com") && isValidUrlMaybe(""),
-  });
-  results.push({ name: "URL validator rejects invalid", pass: !isValidUrlMaybe("notaurl") });
-  results.push({ name: "Reject javascript: URLs", pass: !isValidUrlMaybe("javascript:alert(1)") });
-  const stored = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("grj-admin") : null;
-  results.push({ name: "Editor locked by default", pass: stored !== "true" });
-  results.push({
-    name: "No image when url empty",
-    pass: shouldShowImage(undefined) === false && shouldShowImage("") === false,
-  });
-  results.push({
-    name: "Show image for valid url",
-    pass: shouldShowImage("https://example.com/pic.png") === true,
-  });
-  results.push({ name: "Hide image for invalid url", pass: shouldShowImage("notaurl") === false });
-  const cfgA: GhostRiderConfig = { adminPassword: "pass", adminKey: "key" };
-  const cfgB: GhostRiderConfig = { adminKey: "key" };
-  results.push({
-    name: "Admin password preferred over key",
-    pass: resolveAdminSecret(cfgA) === "pass",
-  });
-  results.push({ name: "Falls back to key", pass: resolveAdminSecret(cfgB) === "key" });
-  results.push({
-    name: "matchSequence detects [g,r,j]",
-    pass: matchSequence(["a", "g", "r", "j"], ["g", "r", "j"]) === true,
-  });
-  results.push({
-    name: "matchSequence false on partial",
-    pass: matchSequence(["g", "r"], ["g", "r", "j"]) === false,
-  });
-  const t1 = toggleLikeState(false, 0);
-  const t2 = toggleLikeState(true, 1);
-  results.push({
-    name: "toggleLikeState increments on like",
-    pass: t1.liked === true && t1.count === 1,
-  });
-  results.push({
-    name: "toggleLikeState decrements on unlike (floored at 0)",
-    pass: t2.liked === false && t2.count === 0,
-  });
-  const sample: ComingPost = { id: "a", caption: "x", createdAt: 1 };
-  const patched = { ...sample, caption: "y" };
-  results.push({ name: "edit patch applies", pass: patched.caption === "y" });
-  const afterDelete = [{ id: "b" } as any].filter((p) => p.id !== "a");
-  results.push({ name: "delete removes item", pass: afterDelete.length === 1 });
-  if (typeof window !== "undefined") {
-    console.groupCollapsed("GRJ post tests");
     results.forEach((r) =>
       console[r.pass ? "log" : "error"](
         `${r.pass ? "✔" : "✖"} ${r.name}${r.message ? ` – ${r.message}` : ""}`,
@@ -1252,8 +1187,6 @@ export function CommentsModal({
   );
 }
 
-
-
 // ---- Stripe hook (dynamic import + mock fallback) ----
 // Minimal type for the parts we use
 type StripeLike = { redirectToCheckout: (opts: any) => Promise<{ error?: any } | void> } | null;
@@ -1416,33 +1349,34 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
   const [askText, setAskText] = useState("");
   const [askSending, setAskSending] = useState(false);
 
-const submitQuestion = async () => {
-  const txt = askText.trim();
-  if (!txt) return;
+  const submitQuestion = async () => {
+    const txt = askText.trim();
+    if (!txt) return;
 
-  if (!user) {            // single guard
-    setAuthGateOpen(true);
-    return;
-  }
+    if (!user) {
+      // single guard
+      setAuthGateOpen(true);
+      return;
+    }
 
-  setAskSending(true);
-  try {
-    await addDoc(collection(db, "questions"), {
-      text: txt,
-      createdAt: serverTimestamp(),
-      userId: user.uid,
-      userName: user.displayName || "discord user",
-      userAvatar: user.photoURL || null,
-      status: "open",
-    });
-    setAskText("");
-    setAskOpen(false);
-  } catch (e) {
-    console.error("Failed to submit question:", e);
-  } finally {
-    setAskSending(false);
-  }
-};
+    setAskSending(true);
+    try {
+      await addDoc(collection(db, "questions"), {
+        text: txt,
+        createdAt: serverTimestamp(),
+        userId: user.uid,
+        userName: user.displayName || "discord user",
+        userAvatar: user.photoURL || null,
+        status: "open",
+      });
+      setAskText("");
+      setAskOpen(false);
+    } catch (e) {
+      console.error("Failed to submit question:", e);
+    } finally {
+      setAskSending(false);
+    }
+  };
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -1493,7 +1427,6 @@ const submitQuestion = async () => {
 
   // What's Coming state
   const { posts, addPost, updatePost, deletePost } = useComingPosts();
-  const postTests = useMemo(() => runPostTests(), []);
   const likes = useLikes();
   const [draft, setDraft] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -1564,6 +1497,7 @@ const submitQuestion = async () => {
 
   return (
     <div className="relative min-h-screen text-white bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#111827] via-[#0a0a0a] to-black overflow-hidden">
+      <GlassNav onLogoClick={onLogoClick} />
       {/* Ambient orbs */}
       <div className="pointer-events-none absolute inset-0">
         <motion.div
@@ -1581,55 +1515,6 @@ const submitQuestion = async () => {
       </div>
       <div className="mx-auto max-w-6xl px-6 py-16">
         {/* Header */}
-        <header className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={onLogoClick}
-              className="h-9 w-9 grid place-items-center rounded-xl bg-white text-black font-black focus:outline-none focus:ring-2 focus:ring-white/20"
-            >
-              GRJ
-            </motion.button>
-            <span className="font-semibold tracking-wide text-white/90">GhostriderJunior</span>
-          </div>
-          <nav className="hidden md:flex items-center gap-6 text-sm text-white/70">
-            {[
-              { href: "#features", label: "Features" },
-              { href: "#support", label: "Support" },
-              { href: "#whats-coming", label: "What's coming" },
-              { href: "/changes", label: "Website updates" },
-              { href: "#faq", label: "FAQ" },
-            ].map((l) => (
-              <a key={l.href} href={l.href} className="relative hover:text-white">
-                <span>{l.label}</span>
-                <motion.span
-                  layoutId={`nav-underline`}
-                  className="absolute -bottom-1 left-0 h-0.5 w-0 bg-white"
-                  whileHover={{ width: "100%" }}
-                />
-              </a>
-            ))}
-            <a
-              href="https://twitter.com"
-              target="_blank"
-              className="hover:text-white flex items-center gap-2"
-              rel="noreferrer"
-            >
-              <Twitter className="h-4 w-4" />
-              Twitter
-            </a>
-            <a
-              href="https://github.com"
-              target="_blank"
-              className="hover:text-white flex items-center gap-2"
-              rel="noreferrer"
-            >
-              <Github className="h-4 w-4" />
-              GitHub
-            </a>
-          </nav>
-        </header>
-
         {/* Hero */}
         <section className="relative mt-14 grid gap-8 md:grid-cols-[1.3fr_1fr] items-center">
           <div>
@@ -1783,7 +1668,6 @@ const submitQuestion = async () => {
         {/* What's Coming (Instagram-like feed + editor) */}
         <section id="whats-coming" className="mt-24">
           <h2 className="text-2xl font-bold">What's Coming</h2>
-
 
           {/* Editor unlock (stealth) */}
           {showUnlock && (
@@ -2027,21 +1911,6 @@ const submitQuestion = async () => {
               </svg>
             </MotionLink>
           </div>
-
-          {/* Post tests output (debug) */}
-          <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
-            <div className="text-xs text-white/60">Editor & UI self-tests:</div>
-            <ul className="mt-2 text-xs grid gap-1">
-              {postTests.map((t, i) => (
-                <li key={i} className={t.pass ? "text-green-300" : "text-red-300"}>
-                  {t.pass ? "✔" : "✖"} {t.name}
-                </li>
-              ))}
-              <li className="text-green-300">
-                ✔ matchSequence works (e.g., [g,r,j] in buffer → true)
-              </li>
-            </ul>
-          </div>
         </section>
 
         {/* FAQ */}
@@ -2122,12 +1991,19 @@ const submitQuestion = async () => {
       <SpeedInsights /> {/* 👈 add this here */}
       <AnimatePresence>
         {askOpen && (
-          <motion.div className="fixed inset-0 z-[70]"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <motion.div onClick={() => setAskOpen(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <motion.div
+            className="fixed inset-0 z-[70]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
             <motion.div
-              role="dialog" aria-modal="true"
+              onClick={() => setAskOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              role="dialog"
+              aria-modal="true"
               className="absolute inset-0 flex items-center justify-center p-4"
               initial={{ scale: 0.96, opacity: 0, y: 12 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -2137,8 +2013,10 @@ const submitQuestion = async () => {
               <div className="w-full max-w-lg rounded-3xl border border-white/10 bg-zinc-900 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
                   <div className="text-sm font-semibold">Ask a question</div>
-                  <button onClick={() => setAskOpen(false)}
-                    className="h-8 w-8 grid place-items-center rounded-full bg-white/10 hover:bg-white/20">
+                  <button
+                    onClick={() => setAskOpen(false)}
+                    className="h-8 w-8 grid place-items-center rounded-full bg-white/10 hover:bg-white/20"
+                  >
                     <X className="h-4 w-4" />
                   </button>
                 </div>
@@ -2157,7 +2035,10 @@ const submitQuestion = async () => {
                         className="min-h-[120px] rounded-2xl bg-black/30 border border-white/10 p-3 outline-none focus:ring-2 focus:ring-white/20"
                       />
                       <div className="flex justify-end gap-2">
-                        <Button className="!bg-white/20 !text-white" onClick={() => setAskOpen(false)}>
+                        <Button
+                          className="!bg-white/20 !text-white"
+                          onClick={() => setAskOpen(false)}
+                        >
                           Cancel
                         </Button>
                         <Button disabled={!askText.trim() || askSending} onClick={submitQuestion}>
@@ -2172,8 +2053,6 @@ const submitQuestion = async () => {
           </motion.div>
         )}
       </AnimatePresence>
-      {/* ☝️☝️ PASTED BLOCK ENDS HERE ☝️☝️ */}
-
       {/* Keep ONE AuthGateModal */}
       <AuthGateModal
         open={authGateOpen}
