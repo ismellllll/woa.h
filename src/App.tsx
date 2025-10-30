@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {useEffect, useMemo, useRef, useState } from "react";
 import { useAuthUser, AuthGateModal } from "./auth";
 import { motion, AnimatePresence } from "framer-motion";
 // NOTE: Avoid static import of @stripe/stripe-js so the sandbox won't crash if the pkg isn't installed.
