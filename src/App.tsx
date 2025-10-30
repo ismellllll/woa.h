@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthUser, AuthGateModal } from "./auth";
 import { motion, AnimatePresence } from "framer-motion";
-import App from "./App";
 // NOTE: Avoid static import of @stripe/stripe-js so the sandbox won't crash if the pkg isn't installed.
 // We'll dynamically import it inside a hook and fall back to a harmless mock in test/sandbox mode.
 import {
@@ -248,10 +247,6 @@ function shouldShowImage(url?: string) {
   return true;
 }
 
-// Admin secret resolver (password preferred, then key)
-function resolveAdminSecret(cfg: GhostRiderConfig) {
-  return cfg.adminPassword || cfg.adminKey || "";
-}
 
 /** Secret sequence matcher: returns true when buffer ends with target sequence */
 export function matchSequence(buffer: string[], target: string[]): boolean {
@@ -1234,50 +1229,6 @@ async function loadStripeSafely(publishableKey: string): Promise<StripeLike> {
   }
 }
 
-function useStripeRedirect(cfg: GhostRiderConfig) {
-  const [stripe, setStripe] = useState<StripeLike>(null);
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (cfg.publishableKey) {
-        const s = await loadStripeSafely(cfg.publishableKey);
-        if (mounted) setStripe(s);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [cfg.publishableKey]);
-
-  const redirect = useCallback(
-    async ({
-      price,
-      mode,
-      successUrl,
-      cancelUrl,
-    }: {
-      price: string;
-      mode: "subscription" | "payment";
-      successUrl: string;
-      cancelUrl: string;
-    }) => {
-      if (!stripe) {
-        console.warn("Stripe not available in sandbox – redirectToCheckout skipped.");
-        return;
-      }
-      await stripe.redirectToCheckout({
-        lineItems: [{ price, quantity: 1 }],
-        mode,
-        successUrl,
-        cancelUrl,
-      });
-    },
-    [stripe],
-  );
-
-  return { stripe, redirect };
-}
-
 // ---- Small UI atoms we referenced but hadn't defined ----
 function TierToggle({
   value,
@@ -1432,7 +1383,6 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
     if (typeof sessionStorage === "undefined") return false;
     return sessionStorage.getItem("grj-admin") === "true";
   });
-  const [adminInput, setAdminInput] = useState("");
 
   useEffect(() => {
     if (isAdmin && typeof sessionStorage !== "undefined") {
