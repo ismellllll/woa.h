@@ -1212,22 +1212,6 @@ export function CommentsModal({
   );
 }
 
-// ---- Stripe hook (dynamic import + mock fallback) ----
-// Minimal type for the parts we use
-type StripeLike = { redirectToCheckout: (opts: any) => Promise<{ error?: any } | void> } | null;
-
-async function loadStripeSafely(publishableKey: string): Promise<StripeLike> {
-  try {
-    // Dynamically import @stripe/stripe-js if available
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod: any = await import("@stripe/stripe-js").catch(() => null);
-    if (!mod || !mod.loadStripe) return null;
-    const stripe = await mod.loadStripe(publishableKey);
-    return (stripe as StripeLike) || null;
-  } catch {
-    return null;
-  }
-}
 
 // ---- Small UI atoms we referenced but hadn't defined ----
 function TierToggle({
