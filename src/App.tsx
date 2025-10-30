@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthUser, AuthGateModal } from "./auth";
 import { motion, AnimatePresence } from "framer-motion";
+import App from "./App";
 // NOTE: Avoid static import of @stripe/stripe-js so the sandbox won't crash if the pkg isn't installed.
 // We'll dynamically import it inside a hook and fall back to a harmless mock in test/sandbox mode.
 import {
@@ -9,8 +10,6 @@ import {
   Infinity as InfinityIcon,
   Shield,
   CheckCircle2,
-  Github,
-  Twitter,
   Sparkles,
   DollarSign,
   AlertTriangle,
@@ -158,6 +157,15 @@ async function upsertUserProfile(authUser: any) {
   }
 }
 
+function getDiscordId(u: any): string | null {
+  if (!u) return null;
+  // Find the Discord provider record if present
+  const rec = Array.isArray(u.providerData)
+    ? u.providerData.find((p: any) => (p?.providerId || "").toLowerCase().includes("discord"))
+    : null;
+  return (rec && rec.uid) || (u as any).discordId || null;
+}
+
 function useCommentCount(postId?: string) {
   const [count, setCount] = useState(0);
   useEffect(() => {
@@ -292,6 +300,12 @@ export type ComingPost = {
   initialLikes?: number;
   likes?: number;
   commentsCount?: number; // ✅ add this
+
+  authorId?: string | null;
+  authorDiscordId?: string | null;
+  authorName?: string | null;
+  authorAvatar?: string | null;
+  authorColor?: number | string | null; // discord accent or hex/hsl
 };
 
 const AVATAR_URL =
@@ -309,6 +323,7 @@ function useComingPosts() {
       const raw = snap.docs.map((d) => {
         const x = d.data();
         const id = d.id;
+
         return {
           id,
           caption: x.caption,
@@ -316,6 +331,13 @@ function useComingPosts() {
           createdAt: x.createdAt?.toMillis?.() ?? Date.now(),
           likes: x.likes ?? 0,
           commentsCount: backfillCache.current[id] ?? x.commentsCount ?? 0, // ⬅️ include
+
+          // NEW
+          authorId: x.authorId ?? null,
+          authorDiscordId: x.authorDiscordId ?? null,
+          authorName: x.authorName ?? null,
+          authorAvatar: x.authorAvatar ?? null,
+          authorColor: x.authorColor ?? null,
         } as ComingPost;
       });
       setPosts(raw);
@@ -357,6 +379,12 @@ function useComingPosts() {
         imageUrl: isHttpUrl(p.imageUrl) ? p.imageUrl : null,
         createdAt: serverTimestamp(),
         likes: 0,
+
+        authorId: (p as any).authorId ?? null,
+        authorDiscordId: (p as any).authorDiscordId ?? null,
+        authorName: (p as any).authorName ?? null,
+        authorAvatar: (p as any).authorAvatar ?? null,
+        authorColor: (p as any).authorColor ?? null,
       });
     } catch (err) {
       console.error("Firestore addDoc failed:", err);
@@ -498,24 +526,26 @@ const VerifiedBadge = () => (
   </span>
 );
 
-const InstaHeader = ({ isAdmin = false }: { isAdmin?: boolean }) => (
-  <div className="flex items-center justify-between px-4 py-3">
-    <div className="flex items-center gap-3">
-      <img
-        src={AVATAR_URL}
-        alt="grj avatar"
-        className="h-8 w-8 rounded-full ring-1 ring-white/10"
-      />
-      <div className="leading-tight">
-        <div className="text-sm font-semibold">
-          ghostriderjunior <VerifiedBadge />
+const InstaHeader = ({ post, isAdmin = false }: { post?: ComingPost; isAdmin?: boolean }) => {
+  const avatar = post?.authorAvatar || AVATAR_URL;
+  const name   = post?.authorName || "ghostriderjunior";
+
+  return (
+    <div className="flex items-center justify-between px-4 py-3">
+      <div className="flex items-center gap-3">
+        <img src={avatar} alt="author avatar" className="h-8 w-8 rounded-full ring-1 ring-white/10" />
+        <div className="leading-tight">
+          <div className="text-sm font-semibold flex items-center gap-1">
+            <span className="text-white">{name}</span>
+            <VerifiedBadge />
+          </div>
+          <div className="text-[10px] text-white/60">Official updates</div>
         </div>
-        <div className="text-[10px] text-white/60">Official updates</div>
       </div>
+      {isAdmin && <MoreHorizontal className="h-5 w-5 text-white/70" />}
     </div>
-    {isAdmin && <MoreHorizontal className="h-5 w-5 text-white/70" />}
-  </div>
-);
+  );
+};
 
 // Like burst particles
 function HeartBurst({ show }: { show: boolean }) {
@@ -838,7 +868,7 @@ export const InstaPostCard = ({
       role="button"
       tabIndex={0}
     >
-      <InstaHeader isAdmin={isAdmin} />
+      <InstaHeader isAdmin={isAdmin} post={post} />
 
       {isAdmin && (
         <div className="absolute top-3 right-3 z-10 opacity-0 group-hover:opacity-100 transition">
@@ -966,7 +996,7 @@ export function PostModal({
                 <X className="h-5 w-5" />
               </motion.button>
               <div className="relative">
-                <InstaHeader isAdmin={isAdmin} />
+                <InstaHeader isAdmin={isAdmin} post={post ?? undefined} />
                 {isAdmin && (
                   <div className="absolute top-3 right-14 z-40">
                     <AdminKebab
@@ -1281,6 +1311,7 @@ function TierToggle({
   );
 }
 
+
 function ProgressBar({ current, goal }: { current: number; goal: number }) {
   const pct = Math.max(0, Math.min(100, Math.round((current / Math.max(goal, 1)) * 100)));
   return (
@@ -1412,12 +1443,6 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
   // Firestore-backed support progress
   const { goal, current, setGoal, setCurrent } = useSupportProgress(isAdmin);
 
-  // Stripe (optional)
-  const { stripe } = useStripeRedirect(cfg);
-  useEffect(() => {
-    console.log("Stripe loaded?", !!stripe, "Key:", cfg.publishableKey);
-  }, [stripe, cfg.publishableKey]);
-
   // Diagnostics
   const diagnostics = useMemo(
     () => runConfigTests(cfg),
@@ -1479,19 +1504,33 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
     if (uploading) return;
     if (imageUrl && !isHttpUrl(imageUrl)) return; // require http/https
 
+    // require login (and your form is only visible when isAdmin anyway)
+    if (!user) {
+      setAuthGateOpen(true);
+      return;
+    }
+
     try {
       await addPost({
         id: crypto.randomUUID(),
         caption: trimmed,
-        imageUrl: isHttpUrl(imageUrl) ? imageUrl : undefined, // sanitize
+        imageUrl: isHttpUrl(imageUrl) ? imageUrl : undefined,
         createdAt: Date.now(),
+
+        // author metadata
+        authorId: user.uid ?? null,
+        authorDiscordId: user.providerData?.[0]?.uid ?? null,
+        authorName: user.displayName || (user as any).globalName || "discord user",
+        authorAvatar: user.photoURL || null,
+        authorColor: (user as any).accentColor ?? (user as any).banner_color ?? null,
       });
 
+      // reset the form after a successful post
       setDraft("");
       setImageUrl("");
-    } catch (err: any) {
-      const code = err?.code || "unknown";
-      setErrMsg(`Failed to post (${code}). Check Firestore rules & console.`);
+    } catch (err) {
+      console.error("Firestore addDoc failed:", err);
+      setErrMsg("Couldn't post update. Check your permissions or network and try again.");
     }
   };
 
@@ -1515,7 +1554,6 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
       </div>
       <div className="mx-auto max-w-6xl px-6 py-16">
         {/* Header */}
-        {/* Hero */}
         <section className="relative mt-14 grid gap-8 md:grid-cols-[1.3fr_1fr] items-center">
           <div>
             <motion.h1
@@ -1674,38 +1712,70 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
             <Card className="mt-6">
               <CardContent>
                 {!isAdmin ? (
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const secret = resolveAdminSecret(cfg);
-                      if (adminInput && secret && adminInput === secret) {
-                        setIsAdmin(true);
-                        setAdminInput("");
-                        setShowUnlock(false);
-                      }
-                    }}
-                    className="grid gap-3"
-                  >
-                    <div className="text-sm text-white/80">Creator login</div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="password"
-                        value={adminInput}
-                        onChange={(e) => setAdminInput(e.target.value)}
-                        placeholder="Enter admin password"
-                        className="flex-1 rounded-2xl bg-black/30 border border-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-white/20"
-                      />
-                      <Button type="submit">Unlock editor</Button>
-                    </div>
-                  </form>
+                  <div className="grid gap-3">
+                    <div className="text-sm text-white/80">Creator unlock</div>
+
+                    {!user ? (
+                      <div className="flex items-center justify-between text-xs text-white/70 rounded-2xl border border-white/10 bg-black/30 p-3">
+                        <span>Sign in with Discord to unlock editor.</span>
+                        <Button onClick={() => setAuthGateOpen(true)}>Login with Discord</Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={user.photoURL || ""}
+                            alt=""
+                            className="h-8 w-8 rounded-full ring-1 ring-white/10"
+                          />
+                          <div className="text-xs text-white/70">
+                            Signed in as{" "}
+                            <span className="font-semibold">
+                              {user.displayName || "discord user"}
+                            </span>
+                          </div>
+                        </div>
+                        <Button
+                          onClick={() => {
+                            const discordId = getDiscordId(user);
+                            const isUidOK = discordId === "817485401975554118";
+
+                            // optional: support a list via window.__GRJ_ADMIN_IDS
+                            const allowList: string[] = (window as any).__GRJ_ADMIN_IDS || [
+                              "817485401975554118",
+                            ];
+                            const inAllowList = discordId && allowList.includes(discordId);
+
+                            const hasClaim =
+                              (auth as any)?.claims?.admin === true ||
+                              (user as any)?.admin === true;
+
+                            if (isUidOK || inAllowList || hasClaim) {
+                              setIsAdmin(true);
+                              setShowUnlock(false);
+                              sessionStorage.setItem("grj-admin", "true");
+                            } else {
+                              console.log("Auth debug:", {
+                                firebaseUid: user?.uid,
+                                discordId,
+                                providerData: user?.providerData,
+                              });
+                              alert("This Discord account is not authorized for creator access.");
+                            }
+                          }}
+                        >
+                          Unlock editor
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="flex items-center justify-between">
                     <div className="text-sm text-white/80">Editor unlocked for this session</div>
                     <Button
                       onClick={() => {
                         setIsAdmin(false);
-                        if (typeof sessionStorage !== "undefined")
-                          sessionStorage.removeItem("grj-admin");
+                        sessionStorage.removeItem("grj-admin");
                       }}
                       className="!bg-white/20 !text-white"
                     >

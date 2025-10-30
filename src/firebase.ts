@@ -14,10 +14,13 @@ const firebaseConfig = {
   appId: "1:1012485967093:web:cd6d9ccfa166c78447c9bc",
 };
 
+
+
+
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const storage = getStorage(app); // 👈 add this line
 export const auth = getAuth(app);
 export const discordProvider = new OAuthProvider("oidc.discord");
 discordProvider.setCustomParameters({ prompt: "consent" });
-
+export default app;
