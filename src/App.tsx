@@ -1947,8 +1947,8 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
               <h3 className="font-semibold">Is this tax-deductible?</h3>
               <p className="mt-2 text-sm text-white/70">
-                This is project support, not a registered charity. Treat as a normal online
-                purchase/donation according to your local rules.
+                Treat it as a normal online
+                purchase according to your local rules.
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
@@ -2112,3 +2112,4 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
     </div>
   );
 }
+
