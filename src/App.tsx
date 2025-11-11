@@ -1508,7 +1508,7 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
               transition={{ delay: 0.05 }}
               className="mt-4 text-white/70 max-w-xl"
             >
-              Support for frequent updates.
+              Support for exclusive content.
             </motion.p>
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <TierToggle value={tier} onChange={setTier} />
@@ -2112,4 +2112,5 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
     </div>
   );
 }
+
 
