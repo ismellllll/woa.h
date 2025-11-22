@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAuthUser, AuthGateModal } from "./auth";
 import { motion, AnimatePresence } from "framer-motion";
 // NOTE: Avoid static import of @stripe/stripe-js so the sandbox won't crash if the pkg isn't installed.
@@ -246,7 +246,6 @@ function shouldShowImage(url?: string) {
   if (!isValidUrlMaybe(url)) return false;
   return true;
 }
-
 
 /** Secret sequence matcher: returns true when buffer ends with target sequence */
 export function matchSequence(buffer: string[], target: string[]): boolean {
@@ -523,12 +522,16 @@ const VerifiedBadge = () => (
 
 const InstaHeader = ({ post, isAdmin = false }: { post?: ComingPost; isAdmin?: boolean }) => {
   const avatar = post?.authorAvatar || AVATAR_URL;
-  const name   = post?.authorName || "ghostriderjunior";
+  const name = post?.authorName || "ghostriderjunior";
 
   return (
     <div className="flex items-center justify-between px-4 py-3">
       <div className="flex items-center gap-3">
-        <img src={avatar} alt="author avatar" className="h-8 w-8 rounded-full ring-1 ring-white/10" />
+        <img
+          src={avatar}
+          alt="author avatar"
+          className="h-8 w-8 rounded-full ring-1 ring-white/10"
+        />
         <div className="leading-tight">
           <div className="text-sm font-semibold flex items-center gap-1">
             <span className="text-white">{name}</span>
@@ -1212,7 +1215,6 @@ export function CommentsModal({
   );
 }
 
-
 // ---- Small UI atoms we referenced but hadn't defined ----
 function TierToggle({
   value,
@@ -1245,7 +1247,6 @@ function TierToggle({
     </div>
   );
 }
-
 
 function ProgressBar({ current, goal }: { current: number; goal: number }) {
   const pct = Math.max(0, Math.min(100, Math.round((current / Math.max(goal, 1)) * 100)));
@@ -1508,7 +1509,7 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
               transition={{ delay: 0.05 }}
               className="mt-4 text-white/70 max-w-xl"
             >
-              Support for exclusive content.
+              Support for frequent updates.
             </motion.p>
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <TierToggle value={tier} onChange={setTier} />
@@ -1947,8 +1948,8 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
               <h3 className="font-semibold">Is this tax-deductible?</h3>
               <p className="mt-2 text-sm text-white/70">
-                Treat it as a normal online
-                purchase according to your local rules.
+                This is project support, not a registered charity. Treat as a normal online
+                purchase/donation according to your local rules.
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md">
@@ -2112,5 +2113,3 @@ export default function GhostRiderJuniorLanding(props: GhostRiderConfig) {
     </div>
   );
 }
-
-

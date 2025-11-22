@@ -8,7 +8,8 @@ import { AuthProvider } from "./auth";
 import QuestionsPage from "./QuestionsPage"
 import NotFoundPage from "./NotFoundPage";
 import WebsiteChangesPage from "./WebsiteChangesPage";
-import JoinPage from "./JoinPage"; 
+import JoinPage from "./JoinPage";
+import MerchPage from "./MerchPage";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -21,6 +22,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="*" element={<NotFoundPage />} />   {/* 👈 catch-all */}
           <Route path="/changes" element={<WebsiteChangesPage />} />
           <Route path="/join" element={<JoinPage />} />
+          <Route path="/merch" element={<MerchPage />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

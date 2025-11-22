@@ -117,6 +117,7 @@ export default function GlassNav({ onLogoClick }: Props) {
       <a href="#whats-coming" className="hover:text-white transition">What’s coming</a>
       <Link to="/questions" className="hover:text-white transition">Questions</Link>
       <Link to="/changes" className="hover:text-white transition">Updates</Link>
+      <Link to="/merch" className="hover:text-white transition">Merch</Link>
     </>
   );
 
@@ -273,6 +274,7 @@ export default function GlassNav({ onLogoClick }: Props) {
                   { label: "What’s coming", href: "#whats-coming" },
                   { label: "Questions", to: "/questions" },
                   { label: "Updates", to: "/changes" },
+                  { label: "Merch", to: "/merch" },
                 ].map((l, i) =>
                   l.href ? (
                     <motion.a
