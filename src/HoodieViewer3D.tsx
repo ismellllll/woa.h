@@ -1,11 +1,14 @@
 import { Suspense, useLayoutEffect, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { OrbitControls, Environment, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
+import hoodieModelUrl from "./assets/gjrj-hoodie.glb";
+
+type GLTFResult = ReturnType<typeof useGLTF>;
 
 function HoodieModel() {
   const group = useRef<THREE.Group>(null!);
-  const { scene } = useGLTF("/grjr-hoodie.glb");
+  const { scene } = useGLTF(hoodieModelUrl) as GLTFResult;
 
   // Center model and enable shadows
   useLayoutEffect(() => {
@@ -20,7 +23,7 @@ function HoodieModel() {
     const box = new THREE.Box3().setFromObject(scene);
     const center = new THREE.Vector3();
     box.getCenter(center);
-    scene.position.sub(center); // move center to (0,0,0)
+    scene.position.sub(center); // put center at (0,0,0)
   }, [scene]);
 
   // Slow auto-rotation
@@ -44,19 +47,32 @@ export default function HoodieViewer3D() {
       shadows
       gl={{ antialias: true, alpha: true }}
     >
-      {/* Dark neutral background so black hoodie is visible */}
-      <color attach="background" args={["#0a0a0a"]} />
+      {/* Dark background so black hoodie is still visible */}
+      <color attach="background" args={["#050509"]} />
 
+      {/* Lights */}
       <ambientLight intensity={0.6} />
       <directionalLight position={[3, 4, 5]} intensity={1.3} castShadow />
       <directionalLight position={[-4, 2, -3]} intensity={0.5} />
 
+      {/* Subtle env reflections */}
+      <Environment preset="city" />
+
       <Suspense fallback={null}>
         <HoodieModel />
       </Suspense>
+
+      {/* Mouse / touch controls */}
+      <OrbitControls
+        enablePan={false}
+        enableZoom={false}
+        enableDamping
+        dampingFactor={0.08}
+      />
     </Canvas>
   );
 }
 
 // Preload model
-useGLTF.preload("/grjr-hoodie.glb");
+useGLTF.preload(hoodieModelUrl);
+
