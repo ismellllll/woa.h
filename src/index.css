@@ -1,29 +1,35 @@
 /* index.css — minimal with Tailwind CDN v3 */
-html, body, #root {
-  height: 100%;
+html,
+body,
+#root {
+  /* let the page grow beyond the initial viewport on iOS */
+  min-height: 100%;
   margin: 0;
   padding: 0;
   background-color: #000;
   color: white;
   font-family: system-ui, sans-serif;
   max-width: 100%;
-  overflow-x: hidden;  /* 👈 prevents side-scroll / wiggle */
+  overflow-x: hidden; /* keep the "no sideways scroll" fix */
+  -webkit-text-size-adjust: 100%;
 }
 
-/* Optional fallback gradient (in case CDN fails) */
+/* Gradient on both html and body so overscroll looks nice */
+html,
 body {
   background: radial-gradient(ellipse at top, #312e81, #18181b, #000);
 }
 
 /* --- GLASS + TONES (minimal) --- */
-:root{
-  --grj-ink:#eaeaf0;
-  --grj-ink-dim:#b8b9c2;
+:root {
+  --grj-ink: #eaeaf0;
+  --grj-ink-dim: #b8b9c2;
 }
-.glass{
-  background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+
+.glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.03));
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* Edge-only ring mask (clips any background to a thin border ring) */
@@ -34,28 +40,29 @@ body {
   inset: 0;
   border-radius: var(--grj-radius);
   padding: var(--grj-thickness);
-  box-sizing: border-box;              /* ← add */
+  box-sizing: border-box;
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
-          mask-composite: exclude;
+  mask-composite: exclude;
   pointer-events: none;
   mix-blend-mode: screen;
   filter:
-    drop-shadow(0 0 10px rgba(255,255,255,0.28))
-    drop-shadow(0 0 18px rgba(170,195,255,0.16));
+    drop-shadow(0 0 10px rgba(255, 255, 255, 0.28))
+    drop-shadow(0 0 18px rgba(170, 195, 255, 0.16));
 }
-
 
 /* Optional: a barely-there static sheen so it doesn't look dead when idle */
 .grj-prism-sheen {
-  background: conic-gradient(from 180deg at 50% 50%, 
-    rgba(255,255,255,0.05), 
-    rgba(255,255,255,0.00) 25%, 
-    rgba(255,255,255,0.06) 50%, 
-    rgba(255,255,255,0.00) 75%, 
-    rgba(255,255,255,0.05));
+  background: conic-gradient(
+    from 180deg at 50% 50%,
+    rgba(255, 255, 255, 0.05),
+    rgba(255, 255, 255, 0) 25%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0) 75%,
+    rgba(255, 255, 255, 0.05)
+  );
   filter: blur(10px);
-  opacity: .35;
+  opacity: 0.35;
 }
