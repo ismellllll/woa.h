@@ -2,13 +2,14 @@ import { Suspense, useLayoutEffect, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import hoodieModelUrl from "./assets/gjrj-hoodie.glb";
-
-type GLTFResult = ReturnType<typeof useGLTF>;
+import hoodieModelUrl from "./assets/gjrj-hoodie.glb"; // or "./assets/..." if file is next to this
 
 function HoodieModel() {
   const group = useRef<THREE.Group>(null!);
-  const { scene } = useGLTF(hoodieModelUrl) as GLTFResult;
+
+  // Cast to any so TS stops complaining about union types
+  const gltf: any = useGLTF(hoodieModelUrl);
+  const scene = gltf.scene as THREE.Group;
 
   // Center model and enable shadows
   useLayoutEffect(() => {
@@ -23,7 +24,7 @@ function HoodieModel() {
     const box = new THREE.Box3().setFromObject(scene);
     const center = new THREE.Vector3();
     box.getCenter(center);
-    scene.position.sub(center); // put center at (0,0,0)
+    scene.position.sub(center); // move model so its center is at (0,0,0)
   }, [scene]);
 
   // Slow auto-rotation
@@ -47,7 +48,7 @@ export default function HoodieViewer3D() {
       shadows
       gl={{ antialias: true, alpha: true }}
     >
-      {/* Dark background so black hoodie is still visible */}
+      {/* Dark background so black hoodie is visible */}
       <color attach="background" args={["#050509"]} />
 
       {/* Lights */}
@@ -55,7 +56,7 @@ export default function HoodieViewer3D() {
       <directionalLight position={[3, 4, 5]} intensity={1.3} castShadow />
       <directionalLight position={[-4, 2, -3]} intensity={0.5} />
 
-      {/* Subtle env reflections */}
+      {/* Env reflections */}
       <Environment preset="city" />
 
       <Suspense fallback={null}>
@@ -74,5 +75,4 @@ export default function HoodieViewer3D() {
 }
 
 // Preload model
-useGLTF.preload(hoodieModelUrl);
-
+useGLTF.preload(hoodieModelUrl as any);
