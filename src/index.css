@@ -6,6 +6,8 @@ html, body, #root {
   background-color: #000;
   color: white;
   font-family: system-ui, sans-serif;
+  max-width: 100%;
+  overflow-x: hidden;  /* 👈 prevents side-scroll / wiggle */
 }
 
 /* Optional fallback gradient (in case CDN fails) */
