@@ -87,7 +87,7 @@ body > * {
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
-  mask-composite: exclude;
+          mask-composite: exclude;
   pointer-events: none;
   mix-blend-mode: screen;
   filter:
@@ -95,7 +95,7 @@ body > * {
     drop-shadow(0 0 18px rgba(170, 195, 255, 0.16));
 }
 
-/* Optional: a barely-there static sheen so it doesn't look dead when idle */
+/* Optional: static sheen so the UI never looks “dead” */
 .grj-prism-sheen {
   background: conic-gradient(
     from 180deg at 50% 50%,
@@ -107,4 +107,12 @@ body > * {
   );
   filter: blur(10px);
   opacity: 0.35;
+}
+
+/* iOS SAFE-AREA FIX (removes the top black bar on iPhone Safari) */
+@supports (padding: max(env(safe-area-inset-top), 0px)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
