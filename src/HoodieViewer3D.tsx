@@ -2,16 +2,20 @@ import { Suspense, useLayoutEffect, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls, Environment, useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import hoodieModelUrl from "./assets/gjrj-hoodie.glb"; // or "./assets/..." if file is next to this
+
+// 🔹 Adjust this path if needed:
+// - If HoodieViewer3D.tsx is in src/ and model is in src/assets/grjr-hoodie.glb → "./assets/grjr-hoodie.glb"
+// - If HoodieViewer3D.tsx is in src/ui/ and model is in src/assets/grjr-hoodie.glb → "../assets/grjr-hoodie.glb"
+import hoodieModelUrl from "./assets/gjrj-hoodie.glb";
 
 function HoodieModel() {
   const group = useRef<THREE.Group>(null!);
 
-  // Cast to any so TS stops complaining about union types
+  // Use `any` to avoid TS union type noise from useGLTF
   const gltf: any = useGLTF(hoodieModelUrl);
   const scene = gltf.scene as THREE.Group;
 
-  // Center model and enable shadows
+  // Center model & enable shadows
   useLayoutEffect(() => {
     scene.traverse((child: THREE.Object3D) => {
       if ((child as any).isMesh) {
@@ -24,11 +28,11 @@ function HoodieModel() {
     const box = new THREE.Box3().setFromObject(scene);
     const center = new THREE.Vector3();
     box.getCenter(center);
-    scene.position.sub(center); // move model so its center is at (0,0,0)
+    scene.position.sub(center); // move so center is at 0,0,0
   }, [scene]);
 
   // Slow auto-rotation
-  useFrame((_state, delta: number) => {
+  useFrame((_state, delta) => {
     if (group.current) {
       group.current.rotation.y += delta * 0.3;
     }
@@ -48,7 +52,7 @@ export default function HoodieViewer3D() {
       shadows
       gl={{ antialias: true, alpha: true }}
     >
-      {/* Dark background so black hoodie is visible */}
+      {/* Dark neutral background */}
       <color attach="background" args={["#050509"]} />
 
       {/* Lights */}
@@ -56,7 +60,7 @@ export default function HoodieViewer3D() {
       <directionalLight position={[3, 4, 5]} intensity={1.3} castShadow />
       <directionalLight position={[-4, 2, -3]} intensity={0.5} />
 
-      {/* Env reflections */}
+      {/* Subtle reflections */}
       <Environment preset="city" />
 
       <Suspense fallback={null}>
